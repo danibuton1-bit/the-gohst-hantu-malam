@@ -179,13 +179,19 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
     let scareCd = 0, lastGhostD = 9999;
     // AI ghost (simulated by the host when nobody plays the ghost)
     const bot = live[BOT_GHOST_ID];
-    let botWp = 0, botDir = 0, botStuck = 0, botSend = 0, botAmbushAt = performance.now() + 25000, botFreeze = 0;
+    let botWp = 0, botDir = 0, botStuck = 0, botSend = 0, botAmbushAt = performance.now() + 25000, botFreeze = 0, botRecoilCd = 0;
     const runBot = (now: number, dt: number) => {
       if (!bot) return;
       if (now > botAmbushAt) { botAmbushAt = now + 30000 + Math.random() * 20000; if (ambush(bot)) botFreeze = now + 900; }
       if (now < botFreeze) { bot.moving = false; if (now - botSend > 100) { botSend = now; send("pos", { id: BOT_GHOST_ID, x: Math.round(bot.x), y: Math.round(bot.y), a: Math.round(bot.yaw * 100) / 100, m: false, st: "alive", k: 0, b: 0 }); } return; }
       const prey = Object.entries(live).filter(([id, l]) => id !== BOT_GHOST_ID && l.status === "alive")
         .map(([, l]) => ({ l, d: Math.hypot(l.x - bot.x, l.y - bot.y) })).filter((o) => o.d < 380 || now < o.l.shoutUntil).sort((a, b) => a.d - b.d)[0];
+      // after startling a hunter up close, the Kuyang recoils away and lets go for 4 s
+      if (prey && prey.d < 110 && now > botRecoilCd) {
+        botRecoilCd = now + 9000; botFreeze = now + 4000;
+        const ax = bot.x - prey.l.x, ay = bot.y - prey.l.y, al = Math.hypot(ax, ay) || 1;
+        const rp = move(bot.x, bot.y, (ax / al) * 140, (ay / al) * 140); bot.x = bot.tx = rp.x; bot.y = bot.ty = rp.y; return;
+      }
       let tx: number, ty: number;
       if (prey) { tx = prey.l.x; ty = prey.l.y; } else { const w = BOT_PATROL[botWp]!; tx = w[0]; ty = w[1]; if (Math.hypot(tx - bot.x, ty - bot.y) < 40) botWp = (botWp + 1) % BOT_PATROL.length; }
       if (MAP_ID === "hotel" && (ty < 500) !== (bot.y < 500)) {

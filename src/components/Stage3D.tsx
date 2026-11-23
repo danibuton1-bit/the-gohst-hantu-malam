@@ -26,10 +26,10 @@ export function Stage3D({ actors, kuyang = false, className, kuyangOnly = false 
     const rim = new THREE.PointLight(0xc4121f, 12, 8); rim.position.set(0, 2.5, -2.5); scene.add(rim);
     const stage = new THREE.Group(); scene.add(stage);
     const n = Math.max(1, live.current.length);
-    const R = kuyangOnly ? 1.2 : Math.max(1.4, n * 0.75);
-    const plat = new THREE.Mesh(new THREE.CylinderGeometry(R, R + 0.12, 0.22, 48), new THREE.MeshStandardMaterial({ color: 0x1a1016, roughness: 0.4, metalness: 0.5 }));
-    plat.position.y = -0.11; stage.add(plat);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(R + 0.02, 0.03, 8, 64), new THREE.MeshBasicMaterial({ color: 0xe8b730 })); ring.rotation.x = Math.PI / 2; ring.position.y = 0.005; stage.add(ring);
+    // open free-standing floor (no round podium), fades into fog like a Free Fire lobby
+    const floorTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d")!; g.fillStyle = "#1a1216"; g.fillRect(0, 0, 128, 128); g.strokeStyle = "#2a1c22"; g.lineWidth = 2; for (let i = 0; i <= 128; i += 32) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 128); g.moveTo(0, i); g.lineTo(128, i); g.stroke(); } const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(20, 20); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.55, metalness: 0.3 }));
+    floor.rotation.x = -Math.PI / 2; scene.add(floor);
     const avs: { a: Avatar; key: string }[] = [];
     if (!kuyangOnly) live.current.forEach((ac, i) => {
       const a = buildAvatar(ac.karakter, (p) => new THREE.MeshStandardMaterial(p), false);
