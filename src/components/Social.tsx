@@ -1,3 +1,4 @@
+import { joinSquad } from "@/lib/squad-store";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Check, Globe, Lock, MessageCircle, Send, UserPlus, Users, X } from "lucide-react";
@@ -114,7 +115,7 @@ export function SocialPanel({ room, className }: { room?: string; className?: st
     if (!code) { code = await createRoomFor(me.id); if (!code) { setInfo("Gagal membuat lobby."); return; } }
     sendInvite(f.friend_id, code);
     setInfo(`Undangan dikirim ke ${f.nama}.`);
-    if (!room) void nav({ to: "/room/$code", params: { code } });
+    if (!room) joinSquad(code);
   }
 
   const msgs = tab === "dunia" ? world : dm;
@@ -220,7 +221,7 @@ export function InvitePopup() {
     <div className="fixed left-1/2 top-3 z-[60] flex w-[min(360px,calc(100vw-1rem))] -translate-x-1/2 items-center gap-2 rounded-xl border border-gold bg-card/95 p-2 shadow-lg">
       <CharImg id={normalizeChar(invite.from.karakter) ?? "raka"} className="h-12" />
       <div className="min-w-0 flex-1 text-sm"><b>{invite.from.nama}</b> mengajakmu main di lobby <b className="text-gold">{invite.code}</b></div>
-      <Button size="sm" onClick={() => { const c = invite.code; clearInvite(); void nav({ to: "/room/$code", params: { code: c } }); }}>Gabung</Button>
+      <Button size="sm" onClick={() => { const c = invite.code; clearInvite(); joinSquad(c); void nav({ to: "/home" }); }}>Gabung</Button>
       <Button size="sm" variant="ghost" onClick={clearInvite}><X /></Button>
     </div>
   );

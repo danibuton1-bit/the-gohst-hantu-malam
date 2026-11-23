@@ -8,6 +8,13 @@
       "when": 1795402989680,
       "tag": "0000_hantu_malam_game",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795404278207,
+      "tag": "0001_squad_lobby_and_media",
+      "breakpoints": true
     }
   ]
 }

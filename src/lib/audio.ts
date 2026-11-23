@@ -1,4 +1,5 @@
 import { getSound } from "./sound-settings";
+import { playSfx, playTrack, setTrackMuted, stopTrack } from "./media";
 // Every sound is synthesized with the Web Audio API — no audio files.
 class HorrorAudio {
   ctx: AudioContext | null = null;
@@ -22,7 +23,7 @@ class HorrorAudio {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   }
   setMuted(m: boolean) {
-    this.muted = m;
+    this.muted = m; setTrackMuted(m);
     if (this.master && this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 0.7, this.ctx.currentTime, 0.05);
   }
   private env(g: GainNode, t: number, a: number, peak: number, dec: number) {
@@ -83,6 +84,7 @@ class HorrorAudio {
   kuyang() {
     if (!this.ctx || !this.master) return;
     const vol = getSound().kuyang; if (vol <= 0) return;
+    if (playSfx("kuyang", vol * 0.8, this.muted)) return;
     const t = this.ctx.currentTime;
     for (const [base, p] of [[900, 0.22], [1350, 0.14], [600, 0.12]] as const) {
       const o = this.ctx.createOscillator(); o.type = "sawtooth";
@@ -111,7 +113,10 @@ class HorrorAudio {
     }
     this.breath.g.gain.setTargetAtTime(level * 0.25, this.ctx.currentTime, 0.3);
   }
-  startMusic() {
+  /** Plays the admin-uploaded track for this screen, or the built-in synth score. */
+  startMusic(kind: "music_lobby" | "music_game" = "music_game") {
+    if (playTrack(kind, getSound().music * 0.6, this.muted)) { if (this.musicTimer) clearInterval(this.musicTimer); this.musicTimer = null; return; }
+    if (kind === "music_lobby") return;
     if (this.musicTimer || !this.ctx) return;
     const notes = [220, 261.6, 207.7, 196, 233.1, 174.6, 246.9, 164.8];
     let i = 0;
@@ -133,6 +138,7 @@ class HorrorAudio {
     this.musicTimer = window.setInterval(play, 1900);
   }
   stopAll() {
+    stopTrack();
     if (this.musicTimer) clearInterval(this.musicTimer);
     this.musicTimer = null;
     this.setBreath(0);

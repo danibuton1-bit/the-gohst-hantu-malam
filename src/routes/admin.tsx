@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsAdmin } from "@/lib/admin";
 import { SoundManager } from "@/components/SoundManager";
+import { MediaManager } from "@/components/MediaManager";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -59,6 +60,7 @@ function AdminPage() {
           </div>
         ))}
       </section>
+      {account && <MediaManager account={account} />}
       <SoundManager />
     </main>
   );

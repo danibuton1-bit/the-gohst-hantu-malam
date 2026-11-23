@@ -16,7 +16,6 @@ import { Route as FpstestRouteImport } from './routes/fpstest'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DroneCodeRouteImport } from './routes/drone.$code'
-import { Route as RoomCodeRouteImport } from './routes/room.$code'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -53,11 +52,6 @@ const DroneCodeRoute = DroneCodeRouteImport.update({
   path: '/drone/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RoomCodeRoute = RoomCodeRouteImport.update({
-  id: '/room/$code',
-  path: '/room/$code',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -67,7 +61,6 @@ export interface FileRoutesByFullPath {
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/drone/$code': typeof DroneCodeRoute
-  '/room/$code': typeof RoomCodeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -77,7 +70,6 @@ export interface FileRoutesByTo {
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/drone/$code': typeof DroneCodeRoute
-  '/room/$code': typeof RoomCodeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -88,7 +80,6 @@ export interface FileRoutesById {
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/drone/$code': typeof DroneCodeRoute
-  '/room/$code': typeof RoomCodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -100,7 +91,6 @@ export interface FileRouteTypes {
     | '/home'
     | '/login'
     | '/drone/$code'
-    | '/room/$code'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -110,7 +100,6 @@ export interface FileRouteTypes {
     | '/home'
     | '/login'
     | '/drone/$code'
-    | '/room/$code'
   id:
     | '__root__'
     | '/'
@@ -120,7 +109,6 @@ export interface FileRouteTypes {
     | '/home'
     | '/login'
     | '/drone/$code'
-    | '/room/$code'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -131,7 +119,6 @@ export interface RootRouteChildren {
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
   DroneCodeRoute: typeof DroneCodeRoute
-  RoomCodeRoute: typeof RoomCodeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -185,13 +172,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DroneCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/room/$code': {
-      id: '/room/$code'
-      path: '/room/$code'
-      fullPath: '/room/$code'
-      preLoaderRoute: typeof RoomCodeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -203,7 +183,6 @@ const rootRouteChildren: RootRouteChildren = {
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
   DroneCodeRoute: DroneCodeRoute,
-  RoomCodeRoute: RoomCodeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

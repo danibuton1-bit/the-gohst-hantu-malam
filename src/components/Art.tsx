@@ -31,13 +31,13 @@ export function EmoteWheel({ open, onPick, onClose, size = 240 }: { open: boolea
   if (!open) return null;
   const r = size / 2 - 34;
   return (
-    <div className="fixed inset-0 z-[55] flex items-center justify-center bg-void/40" onPointerDown={onClose}>
-      <div className="hm-wheel relative rounded-full border-2 border-gold/70 bg-card/85 shadow-2xl" style={{ width: size, height: size }} onPointerDown={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[55] flex items-center justify-center bg-void/40" onClick={onClose}>
+      <div className="hm-wheel relative rounded-full border-2 border-gold/70 bg-card/85 shadow-2xl" style={{ width: size, height: size }} onClick={(e) => e.stopPropagation()}>
         <div className="absolute inset-[30%] flex items-center justify-center rounded-full border border-border bg-void/80 text-center text-[10px] font-bold text-gold">EMOTE</div>
         {EMOTES.map((e, i) => {
           const a = (i / EMOTES.length) * Math.PI * 2 - Math.PI / 2;
           return (
-            <button key={e.id} onPointerDown={(ev) => { ev.stopPropagation(); onPick(e.id); onClose(); }}
+            <button key={e.id} onClick={(ev) => { ev.stopPropagation(); ev.preventDefault(); onClose(); onPick(e.id); }}
               className="absolute flex size-14 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full bg-muted text-foreground transition-transform hover:scale-110 hover:bg-primary/40 active:scale-95"
               style={{ left: size / 2 + Math.cos(a) * r, top: size / 2 + Math.sin(a) * r }} aria-label={e.label}>
               <EmoteIcon id={e.id} className="size-5" /><span className="text-[9px] font-bold">{e.label}</span>

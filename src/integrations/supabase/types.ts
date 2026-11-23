@@ -179,6 +179,39 @@ export type Database = {
           },
         ]
       }
+      media_assets: {
+        Row: {
+          created_at: string
+          ghost: string | null
+          id: string
+          kind: string
+          media_type: string
+          nama: string
+          path: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          ghost?: string | null
+          id?: string
+          kind: string
+          media_type?: string
+          nama?: string
+          path: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          ghost?: string | null
+          id?: string
+          kind?: string
+          media_type?: string
+          nama?: string
+          path?: string
+          url?: string
+        }
+        Relationships: []
+      }
       players: {
         Row: {
           id: string
@@ -259,6 +292,7 @@ export type Database = {
       rooms: {
         Row: {
           code: string
+          countdown_until: string | null
           created_at: string
           host_id: string
           map: string
@@ -266,6 +300,7 @@ export type Database = {
         }
         Insert: {
           code: string
+          countdown_until?: string | null
           created_at?: string
           host_id: string
           map?: string
@@ -273,6 +308,7 @@ export type Database = {
         }
         Update: {
           code?: string
+          countdown_until?: string | null
           created_at?: string
           host_id?: string
           map?: string

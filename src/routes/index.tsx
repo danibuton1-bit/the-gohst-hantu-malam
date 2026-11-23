@@ -23,8 +23,7 @@ export const Route = createFileRoute("/")({
 function Landing() {
   const { ready, account } = useApp();
   const nav = useNavigate();
-  const [splash, setSplash] = useState(true);
-  useEffect(() => { const t = setTimeout(() => setSplash(false), 1800); return () => clearTimeout(t); }, []);
+  const splash = false;
   useEffect(() => { if (!splash && ready && account) void nav({ to: "/home" }); }, [splash, ready, account, nav]);
 
   if (splash || !ready || account) {
