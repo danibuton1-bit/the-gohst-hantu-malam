@@ -1,0 +1,79 @@
+[
+ {
+  "capability": "code",
+  "source": "github danibuton1-bit/hantu-malam-v1 (TanStack Start, same Lovable template)",
+  "outcome": "migrate",
+  "status": "verified",
+  "next_action": ""
+ },
+ {
+  "capability": "schema",
+  "source": "drizzle/migrations/0000_hantu_malam_game.sql (profiles, rooms, players, game_state, friendships, chat_messages, admin_profiles, account_locks, RPCs)",
+  "outcome": "migrate",
+  "status": "verified",
+  "next_action": ""
+ },
+ {
+  "capability": "records",
+  "source": "old backend profiles/friendships/admin_profiles (rooms, players, game_state, chat are temporary)",
+  "outcome": "migrate",
+  "status": "pending",
+  "next_action": "request CSV/JSON export of profiles, friendships, admin_profiles"
+ },
+ {
+  "capability": "auth identities",
+  "source": "custom ID-card login (profiles.kode_id + name via RPC), no auth.users",
+  "outcome": "preserve app's own ID-card login on Lovable Cloud",
+  "status": "pending",
+  "next_action": "import profiles export so existing ID cards keep working"
+ },
+ {
+  "capability": "authorization",
+  "source": "open RLS on game tables, SECURITY DEFINER RPCs, admin_profiles",
+  "outcome": "migrate",
+  "status": "verified",
+  "next_action": ""
+ },
+ {
+  "capability": "realtime",
+  "source": "presence, broadcast, postgres_changes on players/rooms/chat_messages",
+  "outcome": "migrate",
+  "status": "verified",
+  "next_action": ""
+ },
+ {
+  "capability": "AI survival tips",
+  "source": "askSurvivalTip server function via Lovable AI gateway",
+  "outcome": "preserve",
+  "status": "implemented",
+  "next_action": "LOVABLE_API_KEY present; live tip not exercised"
+ },
+ {
+  "capability": "uploaded files",
+  "source": "none detected",
+  "outcome": "none",
+  "status": "verified",
+  "next_action": ""
+ },
+ {
+  "capability": "external providers / webhooks / schedules",
+  "source": "none detected",
+  "outcome": "none",
+  "status": "verified",
+  "next_action": ""
+ },
+ {
+  "capability": "secrets",
+  "source": ".env only held old backend URL/publishable key",
+  "outcome": "replaced by Lovable Cloud",
+  "status": "verified",
+  "next_action": ""
+ },
+ {
+  "capability": "verification",
+  "source": "",
+  "outcome": "",
+  "status": "verified",
+  "next_action": "25 tests pass; created ID card in preview (844x390), reached home; test card removed"
+ }
+]

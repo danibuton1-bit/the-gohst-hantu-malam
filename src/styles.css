@@ -70,77 +70,50 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-blood: var(--blood);
+  --color-gold: var(--gold);
+  --color-void: var(--void);
+  --font-horror: "Creepster", fantasy;
+  --font-sans: "Special Elite", ui-monospace, monospace;
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
-}
-
-.dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+  --radius: 0.5rem;
+  --background: oklch(0.11 0.02 320);
+  --foreground: oklch(0.93 0.02 320);
+  --card: oklch(0.16 0.04 315);
+  --card-foreground: oklch(0.93 0.02 320);
+  --popover: oklch(0.16 0.04 315);
+  --popover-foreground: oklch(0.93 0.02 320);
+  --primary: oklch(0.48 0.2 25);
+  --primary-foreground: oklch(0.97 0.01 20);
+  --secondary: oklch(0.26 0.09 305);
+  --secondary-foreground: oklch(0.93 0.03 310);
+  --muted: oklch(0.2 0.03 315);
+  --muted-foreground: oklch(0.68 0.04 315);
+  --accent: oklch(0.32 0.12 305);
+  --accent-foreground: oklch(0.95 0.02 310);
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.3 0.06 315);
+  --input: oklch(0.3 0.06 315);
+  --ring: oklch(0.5 0.2 25);
+  --blood: oklch(0.42 0.19 25);
+  --gold: oklch(0.8 0.15 85);
+  --void: oklch(0.05 0.01 320);
+  --chart-1: oklch(0.48 0.2 25);
+  --chart-2: oklch(0.45 0.15 305);
+  --chart-3: oklch(0.8 0.15 85);
+  --chart-4: oklch(0.6 0.1 150);
+  --chart-5: oklch(0.7 0.05 320);
+  --sidebar: oklch(0.14 0.03 315);
+  --sidebar-foreground: oklch(0.93 0.02 320);
+  --sidebar-primary: oklch(0.48 0.2 25);
+  --sidebar-primary-foreground: oklch(0.97 0.01 20);
+  --sidebar-accent: oklch(0.26 0.09 305);
+  --sidebar-accent-foreground: oklch(0.93 0.03 310);
+  --sidebar-border: oklch(0.3 0.06 315);
+  --sidebar-ring: oklch(0.5 0.2 25);
 }
 
 @layer base {
@@ -153,3 +126,88 @@
     color: var(--color-foreground);
   }
 }
+
+body { font-family: var(--font-sans); background: radial-gradient(ellipse at top, oklch(0.18 0.06 310), var(--void) 70%) fixed; min-height: 100dvh; }
+.font-horror { font-family: var(--font-horror); letter-spacing: 0.04em; }
+.text-drip { text-shadow: 0 2px 0 var(--void), 0 0 18px color-mix(in oklab, var(--blood) 70%, transparent); }
+.glow-blood { box-shadow: 0 0 24px -4px color-mix(in oklab, var(--blood) 70%, transparent); }
+@keyframes flicker { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.4} 95%{opacity:1} 97%{opacity:.6} }
+.animate-flicker { animation: flicker 3s infinite; }
+@keyframes floaty { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+.animate-floaty { animation: floaty 3s ease-in-out infinite; }
+
+/* Auto-rotate 90deg: phones held upright still see the game in landscape. */
+.landscape-wrap { position: fixed; inset: 0; container-type: size; overflow: hidden; overscroll-behavior: none; }
+html, body { overflow: hidden; overscroll-behavior: none; height: 100%; }
+/* game-style panel + button */
+.game-panel { background: linear-gradient(160deg, color-mix(in oklab, var(--card) 92%, transparent), color-mix(in oklab, var(--void) 85%, transparent)); border: 1px solid color-mix(in oklab, var(--gold) 45%, transparent); box-shadow: inset 0 1px 0 color-mix(in oklab, var(--gold) 25%, transparent), 0 10px 40px -10px var(--void); }
+.btn-game { clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%); background: linear-gradient(180deg, var(--gold), color-mix(in oklab, var(--gold) 60%, var(--blood))); color: var(--void); font-family: var(--font-horror); letter-spacing: .08em; }
+.btn-game:disabled { filter: grayscale(.8) brightness(.6); }
+.stage-floor { background: radial-gradient(ellipse at center, color-mix(in oklab, var(--blood) 55%, transparent), transparent 70%); }
+@media (orientation: portrait) {
+  .landscape-wrap {
+    inset: auto; top: 0; left: 0;
+    width: 100dvh; height: 100dvw;
+    transform-origin: top left;
+    transform: rotate(90deg) translateY(-100%);
+  }
+}
+
+/* ---- character life: blink, breathe, emotes ---- */
+.hm-char .hm-lid { animation: hm-blink 4.2s infinite; animation-delay: var(--blink-delay, 0s); }
+@keyframes hm-blink { 0%, 90%, 100% { transform: scaleY(0); } 93%, 96% { transform: scaleY(1); } }
+.hm-char .hm-body { animation: hm-breathe 3.2s ease-in-out infinite; }
+@keyframes hm-breathe { 50% { transform: scale(1.012, 1.02); } }
+.hm-char .hm-beam { animation: hm-beam 2.6s ease-in-out infinite; }
+@keyframes hm-beam { 50% { opacity: .1; } }
+.hm-char .hm-armL, .hm-char .hm-armR { transition: transform .25s; }
+
+.hm-emote-wave .hm-armL { animation: hm-wave .5s ease-in-out infinite alternate; }
+@keyframes hm-wave { from { transform: rotate(-150deg); } to { transform: rotate(-115deg); } }
+.hm-emote-dance .hm-body { animation: hm-dance .6s ease-in-out infinite alternate; }
+.hm-emote-dance .hm-armL { animation: hm-wave .3s ease-in-out infinite alternate; }
+.hm-emote-dance .hm-armR { animation: hm-armup .3s ease-in-out infinite alternate-reverse; }
+@keyframes hm-dance { from { transform: translateX(-4px) rotate(-6deg); } to { transform: translateX(4px) rotate(6deg); } }
+@keyframes hm-armup { from { transform: rotate(60deg); } to { transform: rotate(130deg); } }
+.hm-emote-laugh .hm-body { animation: hm-laugh .18s ease-in-out infinite alternate; }
+.hm-emote-laugh .hm-armL { transform: rotate(35deg); } .hm-emote-laugh .hm-armR { transform: rotate(-35deg); }
+@keyframes hm-laugh { from { transform: translateY(0) scaleY(1); } to { transform: translateY(-3px) scaleY(.98); } }
+.hm-emote-salute .hm-armL { transform: rotate(-140deg); }
+.hm-emote-salute .hm-body { transform: translateY(-2px); }
+.hm-emote-victory .hm-armL { animation: hm-punch .35s ease-in-out infinite alternate; }
+.hm-emote-victory .hm-body { animation: hm-jump .35s ease-in-out infinite alternate; }
+@keyframes hm-punch { from { transform: rotate(-120deg); } to { transform: rotate(-175deg); } }
+@keyframes hm-jump { to { transform: translateY(-8px); } }
+.hm-emote-scared .hm-body { animation: hm-shake .08s linear infinite alternate; }
+.hm-emote-scared .hm-armL { transform: rotate(-150deg); } .hm-emote-scared .hm-armR { transform: rotate(150deg); }
+@keyframes hm-shake { from { transform: translateX(-2px); } to { transform: translateX(2px); } }
+.hm-emote-hug .hm-armL { transform: rotate(-80deg); } .hm-emote-hug .hm-armR { transform: rotate(80deg); }
+.hm-emote-hug .hm-body { transform: rotate(4deg); }
+.hm-emote-kiss .hm-body { animation: hm-lean .6s ease-in-out infinite alternate; }
+.hm-emote-kiss .hm-armL { transform: rotate(-125deg); }
+@keyframes hm-lean { to { transform: rotate(7deg) translateX(3px); } }
+.hm-hearts > * { animation: hm-heart 1.4s ease-out infinite; }
+@keyframes hm-heart { from { transform: translateY(20px) scale(.6); opacity: 0; } 30% { opacity: 1; } to { transform: translateY(-30px) scale(1.1); opacity: 0; } }
+
+.hm-emote-shy .hm-shy { opacity: 1; }
+.hm-emote-shy .hm-blush { animation: hm-blush .9s ease-in-out infinite alternate; }
+.hm-emote-shy .hm-body { animation: hm-sway .7s ease-in-out infinite alternate; }
+.hm-emote-shy .hm-armL { transform: rotate(-150deg) translateX(4px); } .hm-emote-shy .hm-armR { transform: rotate(150deg) translateX(-4px); }
+.hm-emote-shy .hm-legL { transform: rotate(6deg); } .hm-emote-shy .hm-legR { transform: rotate(-6deg); }
+@keyframes hm-blush { from { opacity: .45; } to { opacity: .95; } }
+@keyframes hm-sway { from { transform: rotate(-4deg); } to { transform: rotate(4deg) translateY(1px); } }
+.hm-walk .hm-legL { animation: hm-step .36s ease-in-out infinite alternate; }
+.hm-walk .hm-legR { animation: hm-step .36s ease-in-out infinite alternate-reverse; }
+.hm-walk .hm-armL { animation: hm-swing .36s ease-in-out infinite alternate-reverse; }
+.hm-walk .hm-armR { animation: hm-swing .36s ease-in-out infinite alternate; }
+.hm-walk .hm-body { animation: hm-bounce .18s ease-in-out infinite alternate; }
+@keyframes hm-step { from { transform: rotate(-16deg); } to { transform: rotate(16deg); } }
+@keyframes hm-swing { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
+@keyframes hm-bounce { to { transform: translateY(-2px); } }
+.hm-emote-hug .hm-armL { transform: rotate(-95deg) scaleX(1.2); } .hm-emote-hug .hm-armR { transform: rotate(95deg) scaleX(1.2); }
+.hm-emote-hug .hm-body { animation: hm-squeeze .5s ease-in-out infinite alternate; }
+@keyframes hm-squeeze { from { transform: rotate(3deg) scale(1); } to { transform: rotate(5deg) scale(1.03, .98); } }
+.hm-wheel { animation: hm-wheel-in .18s ease-out; }
+@keyframes hm-wheel-in { from { transform: scale(.4) rotate(-40deg); opacity: 0; } }
+@keyframes hm-scare { 0% { transform: scale(.3); opacity: 0; } 15% { transform: scale(1.15); opacity: 1; } 30% { transform: scale(1) translateX(-8px); } 40% { transform: translateX(8px); } 80% { opacity: 1; } 100% { transform: scale(1.4); opacity: 0; } }
+.hm-scare { animation: hm-scare 1.3s ease-out forwards; }

@@ -1,0 +1,31 @@
+# Roadmap
+- [x] New characters (Raka, Aisyah, Qila, Nabila), blinking eyes, idle motion
+- [x] Emblem logo
+- [x] World chat (24h), private chat, in-game chat
+- [x] Friends by ID code + invite to lobby, host starts
+- [x] Pick ghost/hunter, AI ghost fallback
+- [x] Minimap, ghost night vision
+- [x] Animated emotes incl. hug/kiss to nearest player
+- [x] Low-end Android performance mode
+- [x] Admin = first registered ID card, admin dashboard with live matches
+- [x] Cinematic admin drone (joystick, up/down, rotate, follow player, visible to players)
+- [x] Admin ID card design (gold border, ADMIN badge)
+- [x] Admin sound manager (music + per-ghost sound effects)
+- [x] New hoodie tentacle ghost from uploaded image
+- [x] Map mode picker: Rumah Tua, Rumah Sakit (flicker), Kuburan (fog), Hotel 2 lantai + lift
+- [x] Squad lobby (empty until invite, invited stand together, captain starts) + 10s countdown
+- [x] Chat new-message notification popup
+- [x] Drone night vision toggle (see in dark when on, normal view when off)
+
+- [x] Drone trailer: fly to 40m, roof fade, crane/orbit shots, 21:9, clean screen
+- [x] Bot teammates fill empty squad slots
+- [x] Hantu Hoodie 3D terbang (ditunda oleh user)
+- [x] Drone director bar (trailer buttons apart from up/down), KUNCI & PUTAR lock-on orbit, drone sees emotes
+- [x] Smoother 3D hunters (rounded shapes, vest, shoes, hair), realistic hug/kiss poses
+- [ ] 3D lobby stage with the same 3D characters
+- [x] No-scroll game-style sign-up/menus, FHD graphics option, full screen button
+- [x] Diagonal wall-clipping fix
+- [x] All ghosts are 3D Kuyang + Kuyang scream + uploaded Kuyang art on jumpscare
+- [ ] Hotel: real 2-floor building, big lift with ↑↓ wall buttons, click-to-open doors, no wall clipping
+- [x] Auto-remove offline players from rooms (stale "Qila" bug)
+- [x] Hantu Hoodie 3D flying
