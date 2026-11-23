@@ -269,19 +269,21 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
     let liftOn = false;
     // ---- doors: closed until someone clicks them (synced over broadcast)
     const toggleDoor = (i: number, open: boolean) => { setDoorOpen(i, open); send("door", { i, o: open }); };
+    let doorLock = 0;
     doorRef.current = (i?: number) => {
       if (meL.status !== "alive") return;
-      const idx = i ?? nearestDoor(meL.x, meL.y, 110); const d = DOORS[idx];
-      if (!d || Math.hypot(d.x - meL.x, d.y - meL.y) > 130) { if (i === undefined) notify("Dekati pintu dulu."); return; }
-      toggleDoor(idx, !doorOpen[idx]);
+      const nowD = performance.now(); if (nowD < doorLock) return; doorLock = nowD + 350;
+      const idx = i ?? nearestDoor(meL.x, meL.y, 140); const d = DOORS[idx];
+      if (!d || Math.hypot(d.x - meL.x, d.y - meL.y) > 160) { if (i === undefined) notify("Dekati pintu dulu."); return; }
+      toggleDoor(idx, !doorOpen[idx]); audio.click(); audio.creak();
     };
     // ---- hotel lift: one physical cabin riding a vertical shaft between floor 1 (0 m) and floor 2 (FLOOR2_H)
     const floorOf = (y: number) => (y >= FLOOR2_Y ? 2 : 1) as 1 | 2;
     const liftS = { f: 1 as 1 | 2, to: 1 as 1 | 2, y: 0, from: 0, t0: 0, moving: false, riding: false, doors: [0, 0] };
-    const LIFT_MS = 2600;
+    const LIFT_MS = 2600, DOOR_CLOSE_MS = 900;
     function startLift(to: 1 | 2, riding: boolean, broadcast = true) {
       if (liftS.moving || (liftS.f === to && !riding)) return;
-      liftS.moving = true; liftS.riding = riding; liftS.to = to; liftS.from = liftS.y; liftS.t0 = performance.now();
+      liftS.moving = true; liftS.riding = riding; liftS.to = to; liftS.from = liftS.y; liftS.t0 = performance.now() + DOOR_CLOSE_MS;
       audio.creak(); if (riding) setRiding(true);
       if (broadcast) send("lift", { to });
     }
@@ -295,7 +297,7 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
     const runLift = (now: number, dt: number) => {
       if (MAP_ID !== "hotel") return;
       if (liftS.moving) {
-        const k = Math.min(1, (now - liftS.t0) / LIFT_MS), e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+        const k = Math.max(0, Math.min(1, (now - liftS.t0) / LIFT_MS)), e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
         liftS.y = liftS.from + ((liftS.to === 2 ? FLOOR2_H : 0) - liftS.from) * e;
         if (k >= 1) {
           liftS.moving = false; liftS.f = liftS.to;
@@ -307,8 +309,8 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
         if (liftS.f !== mf && Math.hypot(pad.x - meL.x, pad.y - meL.y) < 150) startLift(mf, false);
       }
       LIFTS.forEach((pad, i) => {
-        const here = !liftS.moving && liftS.f === i + 1 && Math.hypot(pad.x - meL.x, pad.y - meL.y) < 160;
-        liftS.doors[i]! += ((here ? 1 : 0) - liftS.doors[i]!) * Math.min(1, dt * 3);
+        const here = !liftS.moving && !liftS.riding && liftS.f === i + 1 && Math.hypot(pad.x - meL.x, pad.y - meL.y) < 160;
+        liftS.doors[i]! += ((here ? 1 : 0) - liftS.doors[i]!) * Math.min(1, dt * (here ? 3 : 6));
       });
     };
     let doorT = 0;
@@ -406,7 +408,7 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
         others: all.filter((p) => p.id !== me).map((p) => { const l = live[p.id]!; return { id: p.id, x: l.x, y: l.y, yaw: l.yaw, ghost: p.role === "ghost", shouting: now < l.shoutUntil, visible: l.status === "alive" && l !== cam, moving: l.moving, pitch: l.pitch, emote: now < l.emoteUntil && !(PAIR_EMOTES.includes(l.emote ?? "") && l.moving) ? l.emote : null, ...(liftS.moving && liftAt(l.x, l.y) ? { liftY: liftS.y } : {}) }; }) });
       if (now - hudT > 200) {
         hudT = now;
-        const di = meL.status === "alive" ? nearestDoor(meL.x, meL.y, 110) : -1;
+        const di = meL.status === "alive" ? nearestDoor(meL.x, meL.y, 140) : -1;
         setNearDoor((cur) => { const nx = di >= 0 ? { i: di, open: !!doorOpen[di] } : null; return cur?.i === nx?.i && cur?.open === nx?.open ? cur : nx; });
         setHud({ time: Math.ceil(timeLeft), keys: [0, 1, 2, 3, 4].filter((i) => keyMask & (1 << i)).length, battery: meL.battery, near, room: roomAt(meL.x, meL.y), cd: countdown ? Math.ceil((startedAt - Date.now()) / 1000) : 0, statuses: Object.fromEntries(Object.entries(live).map(([id, l]) => [id, l.status])) });
       }
@@ -457,10 +459,10 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
       {hud.near > 0.2 && <div className="pointer-events-none absolute inset-0 animate-pulse" style={{ background: `repeating-linear-gradient(0deg, rgba(255,255,255,${hud.near * 0.05}) 0 1px, transparent 1px 3px)`, mixBlendMode: "screen" }} />}
       {onLift && !riding && hud.cd === 0 && <div className="absolute bottom-40 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl border-2 border-gold bg-card/90 p-2">
         <span className="px-1 text-xs font-bold text-gold">LIFT</span>
-        <button onPointerDown={() => liftRef.current("up")} aria-label="Naik" className="flex size-12 items-center justify-center rounded-full bg-chart-4 text-xl font-bold text-background">▲</button>
-        <button onPointerDown={() => liftRef.current("down")} aria-label="Turun" className="flex size-12 items-center justify-center rounded-full bg-primary text-xl font-bold text-primary-foreground">▼</button>
+        <button onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); liftRef.current("up"); }} aria-label="Naik" className="flex size-12 items-center justify-center rounded-full bg-chart-4 text-xl font-bold text-background">▲</button>
+        <button onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); liftRef.current("down"); }} aria-label="Turun" className="flex size-12 items-center justify-center rounded-full bg-primary text-xl font-bold text-primary-foreground">▼</button>
       </div>}
-      {!onLift && nearDoor && hud.cd === 0 && <button onPointerDown={() => doorRef.current(nearDoor.i)} className="absolute bottom-40 left-1/2 z-20 -translate-x-1/2 rounded-lg border-2 border-gold bg-card/90 px-5 py-2 font-horror text-lg text-gold">{nearDoor.open ? "TUTUP PINTU" : "BUKA PINTU"}</button>}
+      {!onLift && nearDoor && hud.cd === 0 && <button onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); doorRef.current(nearDoor.i); }} className="absolute bottom-40 left-1/2 z-20 -translate-x-1/2 rounded-lg border-2 border-gold bg-card/90 px-5 py-2 font-horror text-lg text-gold">{nearDoor.open ? "TUTUP PINTU" : "BUKA PINTU"}</button>}
       {riding && <div className="pointer-events-none absolute left-1/2 top-24 z-30 -translate-x-1/2 rounded bg-void/70 px-3 py-1 font-horror text-xl text-gold animate-pulse">LIFT BERGERAK...</div>}
       {hud.cd > 0 && <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-void/60 text-center"><div className="w-full bg-primary/80 py-2 font-horror text-2xl tracking-widest text-primary-foreground">PERTANDINGAN DIMULAI · {MAPS.find((m) => m.id === map)?.nama.toUpperCase()}</div><div key={hud.cd} className="mt-4 font-horror text-[9rem] leading-none text-gold drop-shadow-[0_0_30px_hsl(350_80%_40%)] animate-in zoom-in-50 duration-300">{hud.cd}</div><p className="mt-3 px-6 text-foreground">{amGhost ? "KAMU HANTU ASAP. Kagetkan para pemburu!" : "KAMU PEMBURU. Cari 5 kunci dan kabur!"}</p></div>}
       {toast && <div className="absolute left-1/2 top-20 -translate-x-1/2 rounded-lg border border-gold bg-card/90 px-4 py-2 text-center text-sm font-bold text-gold">{toast}</div>}
