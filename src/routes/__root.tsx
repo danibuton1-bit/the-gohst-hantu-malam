@@ -15,6 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppStateProvider } from "@/components/AppState";
 import { InvitePopup } from "@/components/Social";
 import { BootGate } from "@/components/BootGate";
+import { UiSounds } from "@/components/UiSounds";
 import { tryLockLandscape } from "@/lib/orient";
 
 function NotFoundComponent() {
@@ -132,6 +133,7 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <AppStateProvider>
         <div className="landscape-wrap" onPointerDown={() => void tryLockLandscape()}>
+          <UiSounds />
           <BootGate>
             <Outlet />
             <InvitePopup />

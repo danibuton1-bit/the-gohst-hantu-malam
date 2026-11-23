@@ -222,7 +222,12 @@ function Lobby() {
   useEffect(() => { if (counting && isHost && left === 0) void startMatch(); });
   // tick sound each second
   const lastLeft = useRef<number | null>(null);
-  useEffect(() => { if (counting && left !== lastLeft.current && left !== null && left > 0) audio.tone(left <= 3 ? 880 : 520, 0.12, "square", 0.12); lastLeft.current = left; }, [counting, left]);
+  useEffect(() => {
+    const prev = lastLeft.current;
+    if (counting && left !== prev && left !== null) { if (left > 0) audio.tone(left <= 3 ? 880 : 520, 0.12, "square", 0.12); else audio.matchStart(); }
+    if (!counting && prev !== null && prev > 0) audio.cancel();
+    lastLeft.current = counting ? left : null;
+  }, [counting, left]);
 
   async function setMap(m: MapId) {
     if (!code) return;

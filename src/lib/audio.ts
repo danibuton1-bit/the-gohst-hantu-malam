@@ -98,6 +98,12 @@ class HorrorAudio {
     this.noise(1.4, 3200, 0.7, 0.28 * vol);
     for (let i = 0; i < 5; i++) setTimeout(() => this.noise(0.08, 1100, 3, 0.25 * vol), 1500 + i * 130);
   }
+  /** UI tap: short crisp click for every button. */
+  click() { this.init(); this.tone(1400, 0.04, "square", 0.06); setTimeout(() => this.tone(700, 0.05, "triangle", 0.05), 18); }
+  /** Soft tick for the scroll wheel picker. */
+  tick() { this.init(); this.tone(2200, 0.025, "triangle", 0.05); }
+  cancel() { this.init(); this.tone(520, 0.12, "triangle", 0.12); setTimeout(() => this.tone(330, 0.2, "triangle", 0.12), 100); }
+  matchStart() { this.init(); this.tone(110, 0.9, "sawtooth", 0.18); this.tone(55, 1.2, "sine", 0.3); this.noise(0.8, 1800, 0.6, 0.18); }
   shout() { this.tone(440, 0.3, "square", 0.12); setTimeout(() => this.tone(523, 0.35, "square", 0.12), 200); }
   setBreath(level: number) {
     if (!this.ctx || !this.master || !this.noiseBuf) return;

@@ -7,6 +7,7 @@ import { useApp } from "@/components/AppState";
 import { IdCardView } from "@/components/IdCardView";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateWheel } from "@/components/DateWheel";
 import { Label } from "@/components/ui/label";
 import { createProfile, type Profile } from "@/lib/account";
 import { CHAR_IDS, CHARACTERS, type CharId } from "@/lib/art";
@@ -84,9 +85,9 @@ function Daftar() {
       <form className="flex shrink-0 flex-col gap-2 border-border bg-card/80 px-4 py-3 w-[42%] justify-center border-l border-t-0"
         onSubmit={(e) => { e.preventDefault(); void generate(); }}>
         <h1 className="font-horror text-drip text-2xl leading-none text-primary">DAFTAR AKUN</h1>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-2">
           <div><Label htmlFor="nama" className="text-xs">Nama panggilan</Label><Input id="nama" value={nama} maxLength={30} onChange={(e) => setNama(e.target.value)} placeholder="Nama kamu" className="h-10" /></div>
-          <div><Label htmlFor="tgl" className="text-xs">Tanggal lahir</Label><Input id="tgl" type="date" value={tgl} max="2024-12-31" onChange={(e) => setTgl(e.target.value)} className="h-10" /></div>
+          <div><Label className="text-xs">Tanggal lahir</Label><DateWheel value={tgl} onChange={setTgl} /></div>
         </div>
         {err && <p className="text-xs text-destructive">{err}</p>}
         <Button type="submit" size="lg" disabled={busy} className="h-12 w-full bg-gradient-to-b from-gold to-gold/70 text-base font-black tracking-wider text-void shadow-[0_0_20px_hsl(45_90%_50%/0.5)] hover:from-gold hover:to-gold">
