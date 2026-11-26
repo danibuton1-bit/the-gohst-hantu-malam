@@ -1,3 +1,5 @@
+import { HOUSE, housePoint, moveHouse } from "./house";
+
 // Shared deterministic game world: every client computes the same map, items and NPC paths.
 export const WORLD = { w: 1500, h: 1000 };
 export const GAME_SECONDS = 300;
@@ -83,10 +85,18 @@ export let DOORS = BASE_DOORS;
 export let WALLS: Rect[] = [...OUTER_INNER, ...MID_DOORS, ...FURNITURE];
 export function applyMap(id: MapId) {
   MAP_ID = id;
-  const m = MAPS.find((x) => x.id === id)!;
-  ROOMS = BASE_ROOMS.map((r, i) => ({ ...r, name: m.names[i]! }));
-  DOORS = id === "hotel" ? BASE_DOORS.filter((d) => d.v) : BASE_DOORS;
-  WALLS = [...OUTER_INNER, ...(id === "hotel" ? MID_SOLID : MID_DOORS), ...FURNITURE];
+  WORLD.h = id === "rumah" ? 1250 : 1000;
+  const m = MAPS.find((x) => x.id === id);
+  if (!m) return;
+  ROOMS = BASE_ROOMS.map((r, i) => ({ ...r, name: m.names[i] ?? r.name }));
+  DOORS = id === "rumah" ? [] : id === "hotel" ? BASE_DOORS.filter((d) => d.v) : BASE_DOORS;
+  WALLS = id === "rumah" ? [] : [...OUTER_INNER, ...(id === "hotel" ? MID_SOLID : MID_DOORS), ...FURNITURE];
+  KEYS = id === "rumah" ? HOUSE.placements.keys.map((node, i) => ({ ...BASE_KEYS[i], id: i, name: BASE_KEYS[i]?.name ?? "Kunci Rumah", ...housePoint(node) })) : BASE_KEYS;
+  BATTERIES = id === "rumah" ? HOUSE.placements.batteries.map((node, id) => ({ id, ...housePoint(node) })) : BASE_BATTERIES;
+  EXIT = id === "rumah" ? { ...housePoint(HOUSE.placements.exit), r: 50 } : BASE_EXIT;
+  HUNTER_SPAWNS = id === "rumah" ? HOUSE.placements.spawns.map(housePoint) : BASE_HUNTER_SPAWNS;
+  GHOST_SPAWN = id === "rumah" ? housePoint(HOUSE.placements.ghost) : BASE_GHOST_SPAWN;
+  BOT_PATROL = id === "rumah" ? HOUSE.placements.patrol.map((id) => { const p = housePoint(id); return [p.x, p.y]; }) : BASE_BOT_PATROL;
   doorOpen = DOORS.map(() => false);
 }
 /** Doors start closed and only open when a player clicks them; closed doors block movement. */
@@ -105,20 +115,26 @@ export function liftAt(x: number, y: number) {
   return MAP_ID === "hotel" ? LIFTS.find((l) => Math.hypot(l.x - x, l.y - y) < LIFT_R) ?? null : null;
 }
 
-export const KEYS = [
+const BASE_KEYS = [
   { id: 0, name: "Kunci Ruang Tamu", x: 380, y: 400 },
   { id: 1, name: "Kunci Lorong", x: 900, y: 90 },
   { id: 2, name: "Kunci Dapur", x: 1420, y: 430 },
   { id: 3, name: "Kunci Kamar Mandi", x: 90, y: 920 },
   { id: 4, name: "Kunci Gudang", x: 940, y: 600 },
 ];
-export const BATTERIES = [
+const BASE_BATTERIES = [
   { id: 0, x: 250, y: 300 }, { id: 1, x: 620, y: 420 }, { id: 2, x: 1100, y: 250 },
   { id: 3, x: 350, y: 760 }, { id: 4, x: 720, y: 900 }, { id: 5, x: 1250, y: 940 },
 ];
-export const EXIT = { x: 1420, y: 760, r: 50 };
-export const HUNTER_SPAWNS = [{ x: 250, y: 260 }, { x: 160, y: 380 }, { x: 330, y: 220 }];
-export const GHOST_SPAWN = { x: 1250, y: 780 };
+const BASE_EXIT = { x: 1420, y: 760, r: 50 };
+const BASE_HUNTER_SPAWNS = [{ x: 250, y: 260 }, { x: 160, y: 380 }, { x: 330, y: 220 }];
+const BASE_GHOST_SPAWN = { x: 1250, y: 780 };
+
+export let KEYS: { id: number; name: string; x: number; y: number; h?: number }[] = BASE_KEYS;
+export let BATTERIES: { id: number; x: number; y: number; h?: number }[] = BASE_BATTERIES;
+export let EXIT: { x: number; y: number; r: number; h?: number } = BASE_EXIT;
+export let HUNTER_SPAWNS: { x: number; y: number; h?: number }[] = BASE_HUNTER_SPAWNS;
+export let GHOST_SPAWN: { x: number; y: number; h?: number } = BASE_GHOST_SPAWN;
 
 export function circleHitsRect(cx: number, cy: number, r: number, b: Rect) {
   const nx = Math.max(b.x, Math.min(cx, b.x + b.w));
@@ -126,7 +142,8 @@ export function circleHitsRect(cx: number, cy: number, r: number, b: Rect) {
   return (cx - nx) ** 2 + (cy - ny) ** 2 < r * r;
 }
 
-export function move(x: number, y: number, dx: number, dy: number, r = PLAYER_R): { x: number; y: number } {
+export function move(x: number, y: number, dx: number, dy: number, r = PLAYER_R, h = .756): { x: number; y: number; h?: number } {
+  if (MAP_ID === "rumah") return moveHouse({ x, y, h }, dx, dy);
   const steps = Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 4);
   if (steps > 1) {
     let p = { x, y };
@@ -156,6 +173,7 @@ const NPC_PATHS: { kind: Npc["kind"]; pts: [number, number][]; speed: number }[]
   { kind: "hoodie", pts: [[620, 620], [900, 620], [900, 900], [620, 900]], speed: 48 },
 ];
 export function npcsAt(seconds: number): Npc[] {
+  if (MAP_ID === "rumah") return [];
   return NPC_PATHS.map((p) => {
     const segs = p.pts.map((a, i) => {
       const b = p.pts[(i + 1) % p.pts.length]!;
@@ -203,4 +221,6 @@ export function assignRoles(players: { id: string; pref: string }[], rand = Math
 }
 
 /** AI ghost waypoints (room centres and doorways) used while it has no target. */
-export const BOT_PATROL: [number, number][] = [[1250, 760], [1000, 780], [750, 750], [750, 520], [500, 700], [250, 750], [250, 520], [250, 250], [500, 250], [750, 300], [1000, 320], [1250, 250], [1250, 520]];
+const BASE_BOT_PATROL: [number, number][] = [[1250, 760], [1000, 780], [750, 750], [750, 520], [500, 700], [250, 750], [250, 520], [250, 250], [500, 250], [750, 300], [1000, 320], [1250, 250], [1250, 520]];
+
+export let BOT_PATROL: [number, number][] = BASE_BOT_PATROL;

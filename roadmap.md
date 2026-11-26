@@ -1,4 +1,5 @@
 # Roadmap
+- [ ] Replace Rumah Tua with uploaded GLB; derive collision and walkable stairs from its geometry, verify traversal and rendering.
 - [x] New characters (Raka, Aisyah, Qila, Nabila), blinking eyes, idle motion
 - [x] Emblem logo
 - [x] World chat (24h), private chat, in-game chat

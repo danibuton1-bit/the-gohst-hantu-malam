@@ -15,9 +15,10 @@ import { PAIR_EMOTES, emoteLabel } from "@/lib/emotes";
 import { MuteButton } from "./MuteButton";
 import { Button } from "./ui/button";
 import { SurvivalRadio } from "./SurvivalRadio";
+import { createHouseNavigator, HOUSE, houseHeight, housePoint, housePath, moveHouse } from "@/lib/house";
 
 export type GamePlayer = { id: string; nama: string; username: string; karakter: CharId; role: "ghost" | "hunter" | null; status: string; pref?: string };
-type Live = { yaw: number; x: number; y: number; tx: number; ty: number; status: string; shoutUntil: number; moving: boolean; battery: number; pitch: number; emote: string | null; emoteUntil: number };
+type Live = { h: number; th: number; yaw: number; x: number; y: number; tx: number; ty: number; status: string; shoutUntil: number; moving: boolean; battery: number; pitch: number; emote: string | null; emoteUntil: number };
 
 const HUNTER_SPEED = 150, GHOST_SPEED = 168;
 export const BOT_MATE_PREFIX = "bot-mate-";
@@ -33,7 +34,7 @@ export function squadBots(players: { karakter: string }[]): GamePlayer[] {
 export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLeave, map = "rumah" }: {
   code: string; me: string; players: GamePlayer[]; startedAt: number; isHost: boolean; onBackToLobby: () => void; onLeave: () => void; map?: MapId;
 }) {
-  applyMap(map);
+  const [houseLoaded, setHouseLoaded] = useState(map !== "rumah");
   const [onLift, setOnLift] = useState(false);
   const [riding, setRiding] = useState(false);
   const liftRef = useRef<(dir?: "up" | "down") => void>(() => {});
@@ -68,15 +69,24 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
   useEffect(() => { setIsTouch(window.matchMedia("(pointer: coarse)").matches); }, []);
 
   useEffect(() => {
+    applyMap(map);
     audio.init(); audio.startMusic();
     const hunters = all.filter((p) => p.role === "hunter");
     const live: Record<string, Live> = {};
     all.forEach((p) => {
       const s = p.role === "ghost" ? GHOST_SPAWN : HUNTER_SPAWNS[hunters.indexOf(p) % 3]!;
-      live[p.id] = { yaw: p.role === "ghost" ? 0 : Math.PI, x: s.x, y: s.y, tx: s.x, ty: s.y, status: "alive", shoutUntil: 0, moving: false, battery: 100, pitch: 0, emote: null, emoteUntil: 0 };
+      live[p.id] = { h: s.h ?? 0, th: s.h ?? 0, yaw: p.role === "ghost" ? 0 : Math.PI, x: s.x, y: s.y, tx: s.x, ty: s.y, status: "alive", shoutUntil: 0, moving: false, battery: 100, pitch: 0, emote: null, emoteUntil: 0 };
     });
     let keyMask = 0, batMask = 0, ended = false, lastSend = 0, lastStep = 0, stunUntil = 0, npcCd = 0;
     const meL = live[me]!;
+    const step = (l: Live, dx: number, dy: number) => { const p = move(l.x, l.y, dx, dy, 18, l.h); l.h = p.h ?? l.h; return p; };
+    const navigators = new Map<string, ReturnType<typeof createHouseNavigator>>();
+    const navigate = (id: string, l: Live, x: number, y: number, h = houseHeight(x, y)) => {
+      if (map !== "rumah") return { x, y, h };
+      let nav = navigators.get(id); if (!nav) { nav = createHouseNavigator(); navigators.set(id, nav); }
+      return nav(l, { x, y, h });
+    };
+    const distance = (a: { x: number; y: number; h?: number }, b: { x: number; y: number; h?: number }) => Math.hypot(a.x - b.x, a.y - b.y, map === "rumah" ? ((a.h ?? 0) - (b.h ?? 0)) * 50 : 0);
     const url = (svg: string) => loadImg(svg).src;
     const imgUrls: Record<string, string> = { ghost: url(ghostSvg()), kunti: url(kuntilanakSvg()), hoodie: url(hoodieSvg()), pocong: url(pocongSvg()), key: url(keySvg()), bat: url(batterySvg()), ex: url(exclaimSvg()) };
     (Object.keys(CHARACTERS) as CharId[]).forEach((c) => { imgUrls[c] = url(characterSvg(c)); });
@@ -124,9 +134,9 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
       if (keyMask === 31) { audio.creak(); setTimeout(() => notify(`Semua kunci terkumpul! Kabur lewat gerbang di ${ROOMS[5]!.name}!`), 1200); }
     };
     ch.on("broadcast", { event: "pos" }, ({ payload }) => {
-      const p = payload as { id: string; a?: number; p?: number; x: number; y: number; m: boolean; st: string; k: number; b: number };
+      const p = payload as { id: string; a?: number; p?: number; x: number; y: number; h?: number; m: boolean; st: string; k: number; b: number };
       const l = live[p.id]; if (!l) return;
-      l.tx = p.x; l.ty = p.y; l.moving = p.m; if (p.a !== undefined) l.yaw = p.a; if (p.p !== undefined) l.pitch = p.p;
+      l.tx = p.x; l.ty = p.y; l.th = p.h ?? l.h; l.moving = p.m; if (p.a !== undefined) l.yaw = p.a; if (p.p !== undefined) l.pitch = p.p;
       if (p.st !== "alive") setStatus(p.id, p.st);
       gainKeys(p.k, false); batMask |= p.b;
     });
@@ -164,11 +174,11 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
     // jump-in: the ghost appears right in front of a hunter
     const ambush = (g: Live) => {
       const prey = Object.entries(live).filter(([id, l]) => id !== BOT_GHOST_ID && l !== g && l.status === "alive" && all.find((p) => p.id === id)?.role === "hunter")
-        .map(([, l]) => ({ l, d: Math.hypot(l.x - g.x, l.y - g.y) })).filter((o) => o.d < 520).sort((a, b) => a.d - b.d)[0];
+        .map(([, l]) => ({ l, d: distance(l, g) })).filter((o) => o.d < 520).sort((a, b) => a.d - b.d)[0];
       if (!prey) return false;
-      const p = move(prey.l.x, prey.l.y, -Math.sin(prey.l.yaw) * 75, -Math.cos(prey.l.yaw) * 75);
+      const p = move(prey.l.x, prey.l.y, -Math.sin(prey.l.yaw) * 75, -Math.cos(prey.l.yaw) * 75, 18, prey.l.h);
       if (Math.hypot(p.x - prey.l.x, p.y - prey.l.y) < 45) return false;
-      g.x = g.tx = p.x; g.y = g.ty = p.y; g.yaw = prey.l.yaw + Math.PI;
+      g.x = g.tx = p.x; g.y = g.ty = p.y; g.h = g.th = p.h ?? prey.l.h; g.yaw = prey.l.yaw + Math.PI;
       return true;
     };
     let ghostAmbushCd = 0;
@@ -183,34 +193,35 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
     const runBot = (now: number, dt: number) => {
       if (!bot) return;
       if (now > botAmbushAt) { botAmbushAt = now + 30000 + Math.random() * 20000; if (ambush(bot)) botFreeze = now + 900; }
-      if (now < botFreeze) { bot.moving = false; if (now - botSend > 100) { botSend = now; send("pos", { id: BOT_GHOST_ID, x: Math.round(bot.x), y: Math.round(bot.y), a: Math.round(bot.yaw * 100) / 100, m: false, st: "alive", k: 0, b: 0 }); } return; }
+      if (now < botFreeze) { bot.moving = false; if (now - botSend > 100) { botSend = now; send("pos", { id: BOT_GHOST_ID, x: Math.round(bot.x), y: Math.round(bot.y), h: bot.h, a: Math.round(bot.yaw * 100) / 100, m: false, st: "alive", k: 0, b: 0 }); } return; }
       const prey = Object.entries(live).filter(([id, l]) => id !== BOT_GHOST_ID && l.status === "alive")
-        .map(([, l]) => ({ l, d: Math.hypot(l.x - bot.x, l.y - bot.y) })).filter((o) => o.d < 380 || now < o.l.shoutUntil).sort((a, b) => a.d - b.d)[0];
+        .map(([, l]) => ({ l, d: distance(l, bot) })).filter((o) => o.d < 380 || now < o.l.shoutUntil).sort((a, b) => a.d - b.d)[0];
       // after startling a hunter up close, the Kuyang recoils away and lets go for 4 s
       if (prey && prey.d < 110 && now > botRecoilCd) {
         botRecoilCd = now + 9000; botFreeze = now + 4000;
         const ax = bot.x - prey.l.x, ay = bot.y - prey.l.y, al = Math.hypot(ax, ay) || 1;
-        const rp = move(bot.x, bot.y, (ax / al) * 140, (ay / al) * 140); bot.x = bot.tx = rp.x; bot.y = bot.ty = rp.y; return;
+        const rp = step(bot, (ax / al) * 140, (ay / al) * 140); bot.x = bot.tx = rp.x; bot.y = bot.ty = rp.y; return;
       }
       let tx: number, ty: number;
       if (prey) { tx = prey.l.x; ty = prey.l.y; } else { const w = BOT_PATROL[botWp]!; tx = w[0]; ty = w[1]; if (Math.hypot(tx - bot.x, ty - bot.y) < 40) botWp = (botWp + 1) % BOT_PATROL.length; }
       if (MAP_ID === "hotel" && (ty < 500) !== (bot.y < 500)) {
         // other floor: walk to this floor's lift and ride it
         const l = LIFTS[bot.y < 500 ? 0 : 1]!, o = LIFTS[bot.y < 500 ? 1 : 0]!;
-        if (Math.hypot(l.x - bot.x, l.y - bot.y) < 30) { bot.x = bot.tx = o.x; bot.y = bot.ty = o.y; if (!prey) botWp = (botWp + 1) % BOT_PATROL.length; }
+        if (distance(l, bot) < 30) { bot.x = bot.tx = o.x; bot.y = bot.ty = o.y; if (!prey) botWp = (botWp + 1) % BOT_PATROL.length; }
         tx = l.x; ty = l.y;
       }
-      let ang = Math.atan2(ty - bot.y, tx - bot.x) + botDir;
+      const target = navigate(BOT_GHOST_ID, bot, tx, ty, prey?.l.h ?? houseHeight(tx, ty)); tx = target.x; ty = target.y;
+      let ang = Math.atan2(ty - bot.y, tx - bot.x) + (map === "rumah" ? 0 : botDir);
       const sp = GHOST_SPEED * (prey ? 0.6 : 0.5) * dt;
-      const p = move(bot.x, bot.y, Math.cos(ang) * sp, Math.sin(ang) * sp);
+      const p = step(bot, Math.cos(ang) * sp, Math.sin(ang) * sp);
       if (Math.hypot(p.x - bot.x, p.y - bot.y) < sp * 0.3) { botStuck += dt; if (botStuck > 0.25) { botDir = botDir ? -botDir : Math.PI / 2; botStuck = 0; } } else if (botDir && Math.random() < dt * 0.8) botDir = 0;
       ang = Math.atan2(p.y - bot.y, p.x - bot.x);
-      bot.x = bot.tx = p.x; bot.y = bot.ty = p.y; bot.moving = true; bot.yaw = -ang - Math.PI / 2;
+      bot.x = bot.tx = p.x; bot.y = bot.ty = p.y; bot.th = bot.h; bot.moving = true; bot.yaw = -ang - Math.PI / 2;
       // AI ghost only startles: touching a hunter sends it back to a far patrol point
-      if (Object.entries(live).some(([id, l]) => id !== BOT_GHOST_ID && l.status === "alive" && Math.hypot(l.x - bot.x, l.y - bot.y) < CATCH_DIST)) {
-        botWp = Math.floor(Math.random() * BOT_PATROL.length); const w = BOT_PATROL[(botWp + 6) % BOT_PATROL.length]!; const pp = move(w[0], w[1], 0, 0); bot.x = bot.tx = pp.x; bot.y = bot.ty = pp.y; botFreeze = now + 3000;
+      if (Object.entries(live).some(([id, l]) => id !== BOT_GHOST_ID && l.status === "alive" && distance(l, bot) < CATCH_DIST)) {
+        botWp = Math.floor(Math.random() * BOT_PATROL.length); const w = BOT_PATROL[(botWp + 6) % BOT_PATROL.length]!; const pp = move(w[0], w[1], 0, 0, 18, houseHeight(w[0], w[1])); bot.x = bot.tx = pp.x; bot.y = bot.ty = pp.y; bot.h = bot.th = pp.h ?? bot.h; botFreeze = now + 3000;
       }
-      if (now - botSend > 100) { botSend = now; send("pos", { id: BOT_GHOST_ID, x: Math.round(bot.x), y: Math.round(bot.y), a: Math.round(bot.yaw * 100) / 100, m: true, st: "alive", k: 0, b: 0 }); }
+      if (now - botSend > 100) { botSend = now; send("pos", { id: BOT_GHOST_ID, x: Math.round(bot.x), y: Math.round(bot.y), h: bot.h, a: Math.round(bot.yaw * 100) / 100, m: true, st: "alive", k: 0, b: 0 }); }
     };
     // hunter bots (host simulates them, like the AI ghost): grab keys, flee the ghost, escape when the gate opens
     const mates = all.filter((p) => p.id.startsWith(BOT_MATE_PREFIX)).map((p, i) => ({ id: p.id, l: live[p.id]!, dir: 0, stuck: 0, send: 0, wander: (i * 3) % BOT_PATROL.length, scared: 0 }));
@@ -219,31 +230,32 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
       for (const b of mates) {
         const l = b.l;
         if (l.status === "alive") {
-          let tx: number, ty: number, sp = HUNTER_SPEED * 0.85;
-          const gd = g ? Math.hypot(g.x - l.x, g.y - l.y) : 9999;
+          let tx: number, ty: number, targetH: number | undefined, sp = HUNTER_SPEED * 0.85;
+          const gd = g ? distance(g, l) : 9999;
           if (g && gd < 170) { // run away and shout
             tx = l.x + (l.x - g.x) * 2; ty = l.y + (l.y - g.y) * 2; sp = HUNTER_SPEED;
             if (now > b.scared) { b.scared = now + 6000; l.shoutUntil = now + 2500; send("shout", { id: b.id }); }
-          } else if (keyMask === 31) { tx = EXIT.x; ty = EXIT.y; }
+          } else if (keyMask === 31) { tx = EXIT.x; ty = EXIT.y; targetH = EXIT.h; }
           else {
-            const k = KEYS.filter((key) => !(keyMask & (1 << key.id))).sort((a, c) => Math.hypot(a.x - l.x, a.y - l.y) - Math.hypot(c.x - l.x, c.y - l.y))[mates.indexOf(b) % 2];
-            if (k) { tx = k.x; ty = k.y; } else { const w = BOT_PATROL[b.wander]!; tx = w[0]; ty = w[1]; if (Math.hypot(tx - l.x, ty - l.y) < 40) b.wander = (b.wander + 1) % BOT_PATROL.length; }
+            const k = KEYS.filter((key) => !(keyMask & (1 << key.id))).sort((a, c) => distance(a, l) - distance(c, l))[mates.indexOf(b) % 2];
+            if (k) { tx = k.x; ty = k.y; targetH = k.h; } else { const w = BOT_PATROL[b.wander]!; tx = w[0]; ty = w[1]; if (Math.hypot(tx - l.x, ty - l.y) < 40) b.wander = (b.wander + 1) % BOT_PATROL.length; }
           }
           if (MAP_ID === "hotel" && (ty < 500) !== (l.y < 500)) {
             const a = LIFTS[l.y < 500 ? 0 : 1]!, o = LIFTS[l.y < 500 ? 1 : 0]!;
             if (Math.hypot(a.x - l.x, a.y - l.y) < 30) { const ex = liftExit(o); l.x = l.tx = ex.x; l.y = l.ty = ex.y; }
             tx = a.x; ty = a.y;
           }
-          let ang = Math.atan2(ty - l.y, tx - l.x) + b.dir;
-          const st = sp * dt; const p = move(l.x, l.y, Math.cos(ang) * st, Math.sin(ang) * st);
+          const target = navigate(b.id, l, tx, ty, targetH ?? houseHeight(tx, ty)); tx = target.x; ty = target.y;
+          let ang = Math.atan2(ty - l.y, tx - l.x) + (map === "rumah" ? 0 : b.dir);
+          const st = sp * dt; const p = step(l, Math.cos(ang) * st, Math.sin(ang) * st);
           if (Math.hypot(p.x - l.x, p.y - l.y) < st * 0.3) { b.stuck += dt; if (b.stuck > 0.25) { b.dir = b.dir ? -b.dir : Math.PI / 2; b.stuck = 0; } } else if (b.dir && Math.random() < dt * 0.8) b.dir = 0;
           ang = Math.atan2(p.y - l.y, p.x - l.x);
-          l.x = l.tx = p.x; l.y = l.ty = p.y; l.moving = true; l.yaw = -ang - Math.PI / 2;
-          KEYS.forEach((key) => { if (!(keyMask & (1 << key.id)) && Math.hypot(key.x - l.x, key.y - l.y) < 34) gainKeys(1 << key.id, false); });
-          if (keyMask === 31 && Math.hypot(EXIT.x - l.x, EXIT.y - l.y) < EXIT.r) setStatus(b.id, "escaped");
+          l.x = l.tx = p.x; l.y = l.ty = p.y; l.th = l.h; l.moving = true; l.yaw = -ang - Math.PI / 2;
+          KEYS.forEach((key) => { if (!(keyMask & (1 << key.id)) && distance(key, l) < 34) gainKeys(1 << key.id, false); });
+          if (keyMask === 31 && distance(EXIT, l) < EXIT.r) setStatus(b.id, "escaped");
           else if (ghostId && ghostId !== BOT_GHOST_ID && gd < CATCH_DIST) { setStatus(b.id, "caught"); send("caught", { id: b.id }); }
         } else l.moving = false;
-        if (now - b.send > 100) { b.send = now; send("pos", { id: b.id, x: Math.round(l.x), y: Math.round(l.y), a: Math.round(l.yaw * 100) / 100, m: l.moving, st: l.status, k: keyMask, b: 0 }); }
+        if (now - b.send > 100) { b.send = now; send("pos", { id: b.id, x: Math.round(l.x), y: Math.round(l.y), h: l.h, a: Math.round(l.yaw * 100) / 100, m: l.moving, st: l.status, k: keyMask, b: 0 }); }
       }
     };
     let mapT = 0;
@@ -337,7 +349,7 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
       let ix = (k["d"] || k["arrowright"] ? 1 : 0) - (k["a"] || k["arrowleft"] ? 1 : 0) + joy.current.x;
       let iy = (k["s"] || k["arrowdown"] ? 1 : 0) - (k["w"] || k["arrowup"] ? 1 : 0) + joy.current.y;
       const mag = Math.hypot(ix, iy); if (mag > 1) { ix /= mag; iy /= mag; }
-      const canMove = !countdown && !ended && meL.status === "alive" && now > stunUntil && !liftS.riding;
+      const canMove = sc.ready && !countdown && !ended && meL.status === "alive" && now > stunUntil && !liftS.riding;
       if (walkTo && canMove && now < walkTo.until && Math.hypot(walkTo.x - meL.x, walkTo.y - meL.y) > 38) {
         const a = Math.atan2(walkTo.x - meL.x, walkTo.y - meL.y); meL.yaw = a + Math.PI;
         ix = 0; iy = -1;
@@ -346,43 +358,43 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
       if (meL.moving) {
         const sp = (amGhost ? GHOST_SPEED : HUNTER_SPEED) * dt;
         const fw = -iy, sy = Math.sin(meL.yaw), cy = Math.cos(meL.yaw);
-        const p = move(meL.x, meL.y, (fw * -sy + ix * cy) * sp, (fw * -cy - ix * sy) * sp);
+        const p = step(meL, (fw * -sy + ix * cy) * sp, (fw * -cy - ix * sy) * sp);
         meL.x = p.x; meL.y = p.y;
         if (now - lastStep > (amGhost ? 520 : 330)) { lastStep = now; if (!amGhost) audio.step(); }
       }
-      meL.tx = meL.x; meL.ty = meL.y;
+      meL.tx = meL.x; meL.ty = meL.y; meL.th = meL.h;
       runLift(now, dt);
       const lf = liftAt(meL.x, meL.y) && liftS.f === floorOf(meL.y) && !liftS.moving;
       if (!!lf !== liftOn) { liftOn = !!lf; setOnLift(liftOn); }
-      for (const [id, l] of Object.entries(live)) if (id !== me) { l.x += (l.tx - l.x) * Math.min(1, dt * 12); l.y += (l.ty - l.y) * Math.min(1, dt * 12); }
+      for (const [id, l] of Object.entries(live)) if (id !== me) { l.x += (l.tx - l.x) * Math.min(1, dt * 12); l.y += (l.ty - l.y) * Math.min(1, dt * 12); l.h += (l.th - l.h) * Math.min(1, dt * 12); }
 
-      if (bot && isHost && !countdown && !ended) runBot(now, dt);
-      if (mates.length && isHost && !countdown && !ended) runMates(now, dt);
+      if (sc.ready && bot && isHost && !countdown && !ended) runBot(now, dt);
+      if (sc.ready && mates.length && isHost && !countdown && !ended) runMates(now, dt);
       if (isHost && !countdown && !ended) botDoors(now);
       if (now - mapT > 120) { mapT = now; drawMap(); }
       const npcs = npcsAt(t);
       if (!amGhost && meL.status === "alive" && !countdown && !ended) {
         meL.battery = Math.max(0, meL.battery - dt * 1.1);
-        KEYS.forEach((key) => { if (!(keyMask & (1 << key.id)) && Math.hypot(key.x - meL.x, key.y - meL.y) < 34) gainKeys(1 << key.id, true); });
-        BATTERIES.forEach((b) => { if (!(batMask & (1 << b.id)) && Math.hypot(b.x - meL.x, b.y - meL.y) < 34) { batMask |= 1 << b.id; meL.battery = Math.min(100, meL.battery + 60); audio.pickup(); notify("Baterai senter terisi!"); } });
+        KEYS.forEach((key) => { if (!(keyMask & (1 << key.id)) && distance(key, meL) < 34) gainKeys(1 << key.id, true); });
+        BATTERIES.forEach((b) => { if (!(batMask & (1 << b.id)) && distance(b, meL) < 34) { batMask |= 1 << b.id; meL.battery = Math.min(100, meL.battery + 60); audio.pickup(); notify("Baterai senter terisi!"); } });
         if (now > npcCd) for (const n of npcs) if (Math.hypot(n.x - meL.x, n.y - meL.y) < 40) {
           npcCd = now + 3000; stunUntil = now + 900; meL.battery = Math.max(0, meL.battery - 25); audio.scream();
           notify(n.kind === "hoodie" ? "Hantu Hoodie tertawa dan menjeratmu dengan tentakel! Senter melemah." : n.kind === "pocong" ? "Pocong melompat ke arahmu! Senter melemah." : "Kuntilanak menjerit! Senter melemah.");
           break;
         }
-        if (keyMask === 31 && Math.hypot(EXIT.x - meL.x, EXIT.y - meL.y) < EXIT.r) setStatus(me, "escaped");
+        if (keyMask === 31 && distance(EXIT, meL) < EXIT.r) setStatus(me, "escaped");
       }
       if (amGhost && !countdown && !ended) {
       }
-      if (now - lastSend > 100) { lastSend = now; send("pos", { id: me, x: Math.round(meL.x), y: Math.round(meL.y), a: Math.round(meL.yaw * 100) / 100, p: Math.round(pitch * 100) / 100, m: meL.moving, st: meL.status, k: keyMask, b: batMask }); }
+      if (now - lastSend > 100) { lastSend = now; send("pos", { id: me, x: Math.round(meL.x), y: Math.round(meL.y), h: meL.h, a: Math.round(meL.yaw * 100) / 100, p: Math.round(pitch * 100) / 100, m: meL.moving, st: meL.status, k: keyMask, b: batMask }); }
 
       // proximity fear
       const ghostId = all.find((p) => p.role === "ghost")?.id;
       const gl = ghostId ? live[ghostId] : undefined;
-      const near = !amGhost && gl && meL.status === "alive" ? Math.max(0, 1 - Math.hypot(gl.x - meL.x, gl.y - meL.y) / 360) : 0;
+      const near = !amGhost && gl && meL.status === "alive" ? Math.max(0, 1 - distance(gl, meL) / 360) : 0;
       audio.heartbeat(near); audio.setBreath(amGhost ? 0.25 : near);
       if (!amGhost && gl && meL.status === "alive" && !countdown && !ended) {
-        const d = Math.hypot(gl.x - meL.x, gl.y - meL.y);
+        const d = distance(gl, meL);
         const ang = Math.atan2(gl.x - meL.x, gl.y - meL.y) + Math.PI; const diff = Math.abs(((ang - meL.yaw) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
         if (d < 130 && (lastGhostD - d > 60 || diff < 0.7) && now > scareCd) { scareCd = now + 15000; stunUntil = now + 1500; audio.kuyang(); sc.scare(t); setScare(Math.random()); setTimeout(() => setScare(0), 1400); }
         lastGhostD = d;
@@ -405,17 +417,31 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
       if (meL.status !== "alive") { const alive = Object.entries(live).find(([id, l]) => l.status === "alive" && all.find((p) => p.id === id)?.role === "hunter"); if (alive) cam = alive[1]; }
       const fp = cam === meL;
       sc.frame({ dt, t, cam, yaw: fp ? meL.yaw : cam.yaw, pitch: fp ? pitch : 0, moving: meL.moving, battery: meL.battery, near, keyMask, batMask, npcs, firstPerson: fp && meL.status === "alive", lift: MAP_ID === "hotel" ? { y: liftS.y, doors: liftS.doors, dir: liftS.to === 2 ? 1 : -1, riding: liftS.riding && fp } : null, drone: now - droneAt < 2000 ? droneSt : null,
-        others: all.filter((p) => p.id !== me).map((p) => { const l = live[p.id]!; return { id: p.id, x: l.x, y: l.y, yaw: l.yaw, ghost: p.role === "ghost", shouting: now < l.shoutUntil, visible: l.status === "alive" && l !== cam, moving: l.moving, pitch: l.pitch, emote: now < l.emoteUntil && !(PAIR_EMOTES.includes(l.emote ?? "") && l.moving) ? l.emote : null, ...(liftS.moving && liftAt(l.x, l.y) ? { liftY: liftS.y } : {}) }; }) });
+        others: all.filter((p) => p.id !== me).map((p) => { const l = live[p.id]!; return { id: p.id, x: l.x, y: l.y, h: l.h, yaw: l.yaw, ghost: p.role === "ghost", shouting: now < l.shoutUntil, visible: l.status === "alive" && l !== cam, moving: l.moving, pitch: l.pitch, emote: now < l.emoteUntil && !(PAIR_EMOTES.includes(l.emote ?? "") && l.moving) ? l.emote : null, ...(liftS.moving && liftAt(l.x, l.y) ? { liftY: liftS.y } : {}) }; }) });
       if (now - hudT > 200) {
         hudT = now;
+        if (sc.ready) setHouseLoaded(true);
         const di = meL.status === "alive" ? nearestDoor(meL.x, meL.y, 140) : -1;
         setNearDoor((cur) => { const nx = di >= 0 ? { i: di, open: !!doorOpen[di] } : null; return cur?.i === nx?.i && cur?.open === nx?.open ? cur : nx; });
-        setHud({ time: Math.ceil(timeLeft), keys: [0, 1, 2, 3, 4].filter((i) => keyMask & (1 << i)).length, battery: meL.battery, near, room: roomAt(meL.x, meL.y), cd: countdown ? Math.ceil((startedAt - Date.now()) / 1000) : 0, statuses: Object.fromEntries(Object.entries(live).map(([id, l]) => [id, l.status])) });
+        setHud({ time: Math.ceil(timeLeft), keys: [0, 1, 2, 3, 4].filter((i) => keyMask & (1 << i)).length, battery: meL.battery, near, room: map === "rumah" && meL.h > 1 ? "Tangga Rumah Tua" : roomAt(meL.x, meL.y), cd: countdown ? Math.ceil((startedAt - Date.now()) / 1000) : 0, statuses: Object.fromEntries(Object.entries(live).map(([id, l]) => [id, l.status])) });
       }
     };
 
+    // Dev-only probes exercise the same movement and scene as a live match.
+    const debug = {
+      get state() { return { x: meL.x, y: meL.y, h: meL.h, ready: sc.ready, keyMask }; },
+      teleport(node: number) { const p = housePoint(node); Object.assign(meL, p, { tx: p.x, ty: p.y, th: p.h }); },
+      move(dx: number, dy: number) { const p = step(meL, dx, dy); meL.x = meL.tx = p.x; meL.y = meL.ty = p.y; meL.th = meL.h; },
+      look(yaw: number, p = 0) { meL.yaw = yaw; pitch = p; },
+      path(node: number) { return housePath(meL, housePoint(node)); },
+      walkPath(node: number) { const path = housePath(meL, housePoint(node)); for (const id of path) { const p = housePoint(id); const next = moveHouse(meL, p.x - meL.x, p.y - meL.y); Object.assign(meL, next, { tx: next.x, ty: next.y, th: next.h }); } return { x: meL.x, y: meL.y, h: meL.h }; },
+      placements: HOUSE.placements,
+    };
+    const debugWindow = window as Window & { __game?: typeof debug };
+    if (import.meta.env.DEV) debugWindow.__game = debug;
     raf = requestAnimationFrame(loop);
     return () => {
+      if (import.meta.env.DEV && debugWindow.__game === debug) delete debugWindow.__game;
       cancelAnimationFrame(raf); clearTimeout(toastTimer); sc.dispose();
       window.removeEventListener("resize", onResize); document.removeEventListener("mousemove", onMouse); cv.removeEventListener("click", onClick);
       cv.removeEventListener("pointerdown", onPD); cv.removeEventListener("pointerdown", onTapStart); cv.removeEventListener("pointerup", onTapEnd); window.removeEventListener("pointermove", onPM); window.removeEventListener("pointerup", onPU);
@@ -423,7 +449,7 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
       window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku);
       void supabase.removeChannel(ch); audio.stopAll();
     };
-  }, [code, me, players.map((p) => p.id + p.role).join(), startedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [map, code, me, players.map((p) => p.id + p.role).join(), startedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const spectating = hud.statuses[me] === "caught";
   const won = outcome === "hunters" ? !amGhost : amGhost;
@@ -432,6 +458,7 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
     <div className="fixed inset-0 select-none overflow-hidden bg-void">
       <canvas ref={canvasRef} className="h-full w-full touch-none" style={{ filter: spectating ? "grayscale(1) contrast(1.1)" : amGhost ? "saturate(1.3) hue-rotate(-20deg)" : undefined }} />
       <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,${0.75 + hud.near * 0.2}) 100%)`, boxShadow: hud.near > 0.3 ? `inset 0 0 ${80 * hud.near}px rgba(170,0,20,.6)` : undefined }} />
+      {!houseLoaded && map === "rumah" && <div className="absolute inset-0 z-50 flex items-center justify-center bg-void text-gold font-horror text-2xl">MEMUAT RUMAH...</div>}
       {/* HUD */}
       <div className="absolute inset-x-0 top-0 flex items-start gap-2 p-2">
         <div className="flex flex-wrap items-center gap-2 rounded-lg bg-card/80 px-3 py-1.5 text-sm">

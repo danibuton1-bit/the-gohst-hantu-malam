@@ -6,6 +6,10 @@ import { CHARACTERS, isChar, type CharId } from "./art";
 import { buildAvatar, nameTag, type Avatar } from "./avatar3d";
 import { buildKuyang, type Kuyang } from "./kuyang3d";
 import { getGfx, pixelRatioFor } from "./graphics";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import houseAsset from "@/assets/models/haunted_house_optimized.glb.asset.json";
+import { HOUSE, houseHeight } from "./house";
 
 export const U = 1 / 50;
 /** Weak/old Android phones: lower resolution, cheaper lights and materials, 30 fps. */
@@ -127,7 +131,8 @@ type Ent = { sprite: THREE.Sprite; light?: THREE.PointLight };
 export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "ghost"; amGhost: boolean; imgs: Record<string, string>; drone?: boolean; map?: MapId }) {
   const MAP = opts.map ?? "rumah";
   const STACK = MAP === "hotel";
-  const V = mkV(STACK);
+  const oldV = mkV(STACK);
+  const V = (x: number, y: number, h?: number) => MAP === "rumah" ? { x: x * U, z: y * U, b: h ?? houseHeight(x, y) } : oldV(x, y);
   const L1 = LIFTS[0]!; const shaft = { x: L1.x * U, z: L1.y * U, w: 2.0, h: 1.9 };
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !MOBILE && !LOW_END, powerPreference: LOW_END ? "low-power" : "high-performance" });
   renderer.setPixelRatio(pixelRatioFor(getGfx(), window.devicePixelRatio || 1, !!MOBILE, LOW_END));
@@ -147,10 +152,27 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
   // drone night vision (toggled from the drone HUD)
   const nv = new THREE.AmbientLight(0x80ff9a, 0); scene.add(nv);
 
+  let disposed = false;
+  let houseReady = MAP !== "rumah";
+  if (MAP === "rumah") {
+    const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
+    loader.load(houseAsset.url, (gltf) => {
+      if (disposed) return;
+      const root = gltf.scene;
+      root.scale.setScalar(HOUSE.scale);
+      root.position.set(HOUSE.offset[0] ?? 15, HOUSE.offset[1] ?? 0, HOUSE.offset[2] ?? 21);
+      root.traverse((o) => { if (o instanceof THREE.Mesh) { o.receiveShadow = true; const materials = Array.isArray(o.material) ? o.material : [o.material]; materials.forEach((m) => { m.side = THREE.DoubleSide; }); } });
+      scene.add(root); houseReady = true;
+    }, undefined, () => { canvas.dataset["sceneError"] = "Rumah gagal dimuat"; });
+    const daylight = new THREE.HemisphereLight(0xaabdc9, 0x3f3931, 1.5); scene.add(daylight);
+    const moon = new THREE.DirectionalLight(0xc5d2dc, 1.6); moon.position.set(-5, 15, 10); scene.add(moon);
+    (scene.fog as THREE.FogExp2).density = .018;
+    scene.background = new THREE.Color(0x101820);
+  }
   // floors and ceilings per room
   const ceilings: THREE.Mesh[] = [];
   let nvOn = false;
-  for (const r of ROOMS) {
+  for (const r of MAP === "rumah" ? [] : ROOMS) {
     const outdoor = MAP === "kuburan" || (MAP === "rumah" && r.name.startsWith("Kuburan"));
     const tex = MAP === "rumahsakit" ? tileTex("#c9d6cf", "#9fb0a8") : MAP === "hotel" ? carpetTex(r.y < 500 ? "#5a1018" : "#18304a") : outdoor ? canvasTex((g, s) => { g.fillStyle = "#1a2414"; g.fillRect(0, 0, s, s); for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(${40 + Math.random() * 40},${60 + Math.random() * 50},30,.6)`; g.fillRect(Math.random() * s, Math.random() * s, 2, 5); } }, 1) : woodTex(r.floor === "#18222a" ? "#2b3a40" : "#4a2e1e");
     tex.repeat.set(r.w * U / 3, r.h * U / 3);
@@ -168,7 +190,7 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
   const wallMat = MAP === "rumahsakit" ? Mat({ map: tileTex("#dfe8e2", "#b8c6bf"), roughness: 0.6 }) : MAP === "hotel" ? Mat({ map: wallpaperTex, roughness: 0.9 }) : MAP === "kuburan" ? Mat({ map: stoneTex, roughness: 1 }) : Mat({ map: wallTex, roughness: 0.95 });
   const WALL_HM = MAP === "kuburan" ? 1.5 : WALL_H;
   const furnMat = Mat({ map: woodTex("#3a2214"), roughness: 0.8 });
-  for (const w0 of WALLS) for (const w of splitRect(STACK, w0)) {
+  for (const w0 of MAP === "rumah" ? [] : WALLS) for (const w of splitRect(STACK, w0)) {
     const isWall = Math.min(w0.w, w0.h) <= 20;
     const h = isWall ? WALL_HM : 0.9;
     const m = new THREE.Mesh(new THREE.BoxGeometry(w.w * U, h, w.h * U), isWall ? wallMat : furnMat);
@@ -235,14 +257,14 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
   const theme = buildTheme(scene, MAP);
   // graves
   const graveMat = Mat({ color: 0x5a5d58, roughness: 1 });
-  for (const [gx, gy] of (MAP === "kuburan" ? [[1060, 600], [1260, 640], [1380, 880], [1080, 900], [120, 300], [380, 120], [640, 330], [880, 160], [1320, 420], [220, 820], [600, 860], [900, 640]] : MAP === "rumah" ? [[1060, 600], [1260, 640], [1380, 880], [1080, 900]] : []) as [number, number][]) {
+  for (const [gx, gy] of (MAP === "kuburan" ? [[1060, 600], [1260, 640], [1380, 880], [1080, 900], [120, 300], [380, 120], [640, 330], [880, 160], [1320, 420], [220, 820], [600, 860], [900, 640]] : []) as [number, number][]) {
     const g = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.1, 0.2), graveMat); g.position.set((gx + 17) * U, 0.55, (gy + 22) * U); g.rotation.z = 0.08; scene.add(g);
     const top = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.2, 16, 1, false, 0, Math.PI), graveMat); top.rotation.set(Math.PI / 2, 0, Math.PI / 2); top.position.set((gx + 17) * U, 1.1, (gy + 22) * U); scene.add(top);
   }
   // exit gate
   const gateMat = Mat({ color: 0x8b0d17, emissive: 0x8b0d17, emissiveIntensity: 0.6 });
   const gate = new THREE.Mesh(new THREE.TorusGeometry(EXIT.r * U, 0.08, 8, 32), gateMat);
-  { const v = V(EXIT.x, EXIT.y); gate.position.set(v.x, v.b + EXIT.r * U + 0.1, v.z); } gate.rotation.y = Math.PI / 2; scene.add(gate);
+  { const v = V(EXIT.x, EXIT.y, EXIT.h); gate.position.set(v.x, v.b + EXIT.r * U + 0.1, v.z); } gate.rotation.y = Math.PI / 2; scene.add(gate);
   const gateLight = new THREE.PointLight(0x8b0d17, 2, 5); gateLight.position.copy(gate.position); scene.add(gateLight);
 
   const tl = new THREE.TextureLoader();
@@ -252,8 +274,8 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(k), transparent: true, alphaTest: 0.1 }));
     s.scale.set(w, h, 1); scene.add(s); return s;
   };
-  const keys = KEYS.map((k) => { const s = sprite("key", 0.6, 0.3); const v = V(k.x, k.y); s.position.set(v.x, v.b + 0.6, v.z); s.userData["b"] = v.b; const l = new THREE.PointLight(0xffc840, 0.8, 2.5); l.position.copy(s.position); if (!LOW_END) scene.add(l); return { sprite: s, light: l } as Ent; });
-  const bats = BATTERIES.map((b) => { const s = sprite("bat", 0.25, 0.4); const v = V(b.x, b.y); s.position.set(v.x, v.b + 0.3, v.z); const l = new THREE.PointLight(0x60ff80, 0.5, 1.8); l.position.copy(s.position); if (!LOW_END) scene.add(l); return { sprite: s, light: l } as Ent; });
+  const keys = KEYS.map((k) => { const s = sprite("key", 0.6, 0.3); const v = V(k.x, k.y, k.h); s.position.set(v.x, v.b + 0.6, v.z); s.userData["b"] = v.b; const l = new THREE.PointLight(0xffc840, 0.8, 2.5); l.position.copy(s.position); if (!LOW_END) scene.add(l); return { sprite: s, light: l } as Ent; });
+  const bats = BATTERIES.map((b) => { const s = sprite("bat", 0.25, 0.4); const v = V(b.x, b.y, b.h); s.position.set(v.x, v.b + 0.3, v.z); const l = new THREE.PointLight(0x60ff80, 0.5, 1.8); l.position.copy(s.position); if (!LOW_END) scene.add(l); return { sprite: s, light: l } as Ent; });
   const npcKuyangs: Record<string, Kuyang> = {};
   const players: Record<string, { sprite: THREE.Sprite | null; av: Avatar | null; ku: Kuyang | null; tag: THREE.Sprite | null; light: THREE.SpotLight; target: THREE.Object3D; shout: THREE.Sprite }> = {};
 
@@ -310,7 +332,7 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
   const ledR = new THREE.Mesh(new THREE.SphereGeometry(0.03), new THREE.MeshBasicMaterial({ color: 0xff2030 })); ledR.position.set(-0.12, -0.06, 0.17);
   const ledG = new THREE.Mesh(new THREE.SphereGeometry(0.03), new THREE.MeshBasicMaterial({ color: 0x30ff60 })); ledG.position.set(0.12, -0.06, 0.17);
   const dLight = new THREE.PointLight(0xff3040, 1.2, 3); dLight.position.y = -0.15; drone.add(ledR, ledG, dLight);
-  let bobT = 0, vmX = 0;
+  let bobT = 0, vmX = 0, cameraBase: number | undefined;
   // 3D jumpscare: a full Kuyang lunges out of the dark straight at the camera, fangs first, with heavy shake
   const scareKu = buildKuyang(false); scareKu.root.visible = false; camera.add(scareKu.root);
   scareKu.root.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.Material | undefined; if (m) { (m as THREE.MeshStandardMaterial).fog = false; m.depthTest = false; } o.renderOrder = 20; });
@@ -318,6 +340,7 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
   let scareAt = -1;
   const raycaster = new THREE.Raycaster(); raycaster.far = 3.2;
   return {
+    get ready() { return houseReady; },
     resize() {
       const w = canvas.clientWidth, h = canvas.clientHeight;
       renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); vmX = w < h ? -0.13 : 0; vm.scale.setScalar(w < h ? 0.8 : 1);
@@ -336,9 +359,9 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
       players[id] = { sprite: s, av, ku, tag, light, target, shout };
     },
     frame(st: {
-      dt: number; t: number; cam: { x: number; y: number }; yaw: number; pitch: number; moving: boolean; battery: number; near: number;
+      dt: number; t: number; cam: { x: number; y: number; h?: number }; yaw: number; pitch: number; moving: boolean; battery: number; near: number;
       keyMask: number; batMask: number; npcs: { kind: string; x: number; y: number }[];
-      others: { id: string; x: number; y: number; yaw: number; visible: boolean; shouting: boolean; ghost: boolean; moving: boolean; pitch: number; emote: string | null; liftY?: number }[];
+      others: { id: string; x: number; y: number; yaw: number; visible: boolean; shouting: boolean; ghost: boolean; moving: boolean; pitch: number; emote: string | null; h?: number; liftY?: number }[];
       firstPerson: boolean; camH?: number; drone?: { x: number; y: number; h: number; yaw: number } | null;
       /** Hotel lift: cabin height (m), landing door openness per floor (0..1), travel direction, and whether the camera rides it. */
       lift?: { y: number; doors: number[]; dir: number; riding: boolean } | null;
@@ -350,7 +373,7 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
         dr.open += ((near ? 1 : 0) - dr.open) * Math.min(1, st.dt * 4);
         dr.pivot.rotation.y = dr.base + dr.open * 1.6;
       });
-      const cv = V(st.cam.x, st.cam.y);
+      const cv = V(st.cam.x, st.cam.y, st.cam.h);
       if (lift && st.lift) {
         const L = st.lift; lift.cabin.position.y = L.y;
         lift.land.forEach((ld, i) => { const o = L.doors[i] ?? 0; ld.l.position.x = -0.45 - o * 0.85; ld.r.position.x = 0.45 + o * 0.85; });
@@ -358,7 +381,9 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
         const txt = L.y > FLOOR2_H - 0.05 ? "2" : L.y < 0.05 ? "1" : L.dir > 0 ? "▲" : "▼";
         if (txt !== lift.label.last) { const g = lift.label.ctx; g.fillStyle = "#120a04"; g.fillRect(0, 0, 128, 64); g.fillStyle = "#ffb030"; g.font = "bold 44px monospace"; g.textAlign = "center"; g.fillText(txt, 64, 48); lift.label.tex.needsUpdate = true; lift.label.last = txt; }
       }
-      const camBase = st.lift?.riding ? st.lift.y : cv.b;
+      const base = st.lift?.riding ? st.lift.y : cv.b;
+      cameraBase = cameraBase === undefined ? base : cameraBase + (base - cameraBase) * Math.min(1, st.dt * 12);
+      const camBase = MAP === "rumah" ? cameraBase : base;
       if (st.moving) bobT += st.dt * 9;
       const bob = st.firstPerson ? Math.sin(bobT) * 0.04 : 0;
       const shake = st.near > 0.55 ? (Math.random() - 0.5) * st.near * 0.03 : 0;
@@ -408,7 +433,7 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
       });
       for (const o of st.others) {
         const p = players[o.id]; if (!p) continue;
-        const ov = V(o.x, o.y); const ob = o.liftY ?? ov.b, ox = ov.x, oz = ov.z;
+        const ov = V(o.x, o.y, o.h); const ob = o.liftY ?? ov.b, ox = ov.x, oz = ov.z;
         p.light.visible = o.visible && !o.ghost;
         if (p.av) {
           p.av.root.visible = o.visible; p.av.root.position.set(ox, ob, oz); p.av.root.rotation.y = o.yaw;
@@ -431,6 +456,7 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
       }
       theme.update(st.t, st.dt, st.cam);
       renderer.render(scene, camera);
+      if (houseReady) canvas.dataset["sceneReady"] = "1";
     },
     setNightVision(on: boolean) {
       nvOn = on; nv.intensity = on ? 3.2 : 0;
@@ -447,7 +473,7 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
       const hit = raycaster.intersectObjects(pickables, false)[0];
       return (hit?.object.userData["pick"] as string | undefined) ?? null;
     },
-    dispose() { renderer.dispose(); },
+    dispose() { disposed = true; delete canvas.dataset["sceneReady"]; scene.traverse((o) => { if (o instanceof THREE.Mesh) { o.geometry.dispose(); const materials = Array.isArray(o.material) ? o.material : [o.material]; materials.forEach((m) => m.dispose()); } }); renderer.dispose(); },
   };
 }
 export { WORLD };
