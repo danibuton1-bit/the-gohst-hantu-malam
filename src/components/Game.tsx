@@ -4,7 +4,7 @@ import { Battery, Ghost, KeyRound, Megaphone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { batterySvg, characterSvg, CHARACTERS, exclaimSvg, ghostSvg, keySvg, kuntilanakSvg, hoodieSvg, loadImg, pocongSvg, type CharId } from "@/lib/art";
 import { audio } from "@/lib/audio";
-import { BATTERIES, BOT_GHOST_ID, BOT_PATROL, CATCH_DIST, ROOMS, WALLS, WORLD, decideOutcome, EXIT, GAME_SECONDS, GHOST_SPAWN, HUNTER_SPAWNS, KEYS, move, npcsAt, roomAt, TOTAL_KEYS, applyMap, liftAt, liftExit, LIFTS, MAP_ID, MAPS, DOORS, doorOpen, setDoorOpen, nearestDoor, FLOOR2_H, FLOOR2_Y, type MapId } from "@/lib/game";
+import { BATTERIES, BOT_GHOST_ID, BOT_PATROL, CATCH_DIST, ROOMS, WALLS, WORLD, decideOutcome, EXIT, GAME_SECONDS, GHOST_SPAWN, HUNTER_SPAWNS, KEYS, move, npcsAt, roomAt, TOTAL_KEYS, applyMap, liftAt, liftExit, LIFTS, MAP_ID, MAPS, DOORS, doorOpen, doorUsed, setDoorOpen, nearestDoor, FLOOR2_H, FLOOR2_Y, type MapId } from "@/lib/game";
 import { CharImg, EmoteIcon, EmoteWheel } from "./Art";
 import { Bubble } from "./Social";
 import { Joystick } from "./Joystick";
@@ -285,8 +285,8 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
     doorRef.current = (i?: number) => {
       if (meL.status !== "alive") return;
       const nowD = performance.now(); if (nowD < doorLock) return; doorLock = nowD + 350;
-      const idx = i ?? nearestDoor(meL.x, meL.y, 140); const d = DOORS[idx];
-      if (!d || Math.hypot(d.x - meL.x, d.y - meL.y) > 160) { if (i === undefined) notify("Dekati pintu dulu."); return; }
+      const idx = i ?? nearestDoor(meL.x, meL.y, 140, meL.h); const d = DOORS[idx];
+      if (!d || (d.h !== undefined && Math.abs(d.h - meL.h) > .5) || Math.hypot(d.x - meL.x, d.y - meL.y) > 160) { if (i === undefined) notify("Dekati pintu dulu."); return; }
       toggleDoor(idx, !doorOpen[idx]); audio.click(); audio.creak();
     };
     // ---- hotel lift: one physical cabin riding a vertical shaft between floor 1 (0 m) and floor 2 (FLOOR2_H)
@@ -331,7 +331,7 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
       if (now - doorT < 250) return; doorT = now;
       for (const p of all) if (p.id === BOT_GHOST_ID || p.id.startsWith(BOT_MATE_PREFIX)) {
         const l = live[p.id]!; if (l.status !== "alive") continue;
-        const i = nearestDoor(l.x, l.y, 75); if (i >= 0 && !doorOpen[i]) toggleDoor(i, true);
+        const i = nearestDoor(l.x, l.y, 75, l.h); if (i >= 0 && !doorOpen[i] && !doorUsed[i]) toggleDoor(i, true);
       }
     };
     let raf = 0, last = performance.now(), hudT = 0;
@@ -421,20 +421,22 @@ export function Game({ code, me, players, startedAt, isHost, onBackToLobby, onLe
       if (now - hudT > 200) {
         hudT = now;
         if (sc.ready) setHouseLoaded(true);
-        const di = meL.status === "alive" ? nearestDoor(meL.x, meL.y, 140) : -1;
+        const di = meL.status === "alive" ? nearestDoor(meL.x, meL.y, 140, meL.h) : -1;
         setNearDoor((cur) => { const nx = di >= 0 ? { i: di, open: !!doorOpen[di] } : null; return cur?.i === nx?.i && cur?.open === nx?.open ? cur : nx; });
-        setHud({ time: Math.ceil(timeLeft), keys: [0, 1, 2, 3, 4].filter((i) => keyMask & (1 << i)).length, battery: meL.battery, near, room: map === "rumah" && meL.h > 1 ? "Tangga Rumah Tua" : roomAt(meL.x, meL.y), cd: countdown ? Math.ceil((startedAt - Date.now()) / 1000) : 0, statuses: Object.fromEntries(Object.entries(live).map(([id, l]) => [id, l.status])) });
+        setHud({ time: Math.ceil(timeLeft), keys: [0, 1, 2, 3, 4].filter((i) => keyMask & (1 << i)).length, battery: meL.battery, near, room: map === "rumah" ? meL.h >= HOUSE.extension.upper - .05 ? "Rumah Tua · Lantai 2" : meL.h > 1 ? "Tangga Rumah Tua" : "Rumah Tua · Lantai 1" : roomAt(meL.x, meL.y), cd: countdown ? Math.ceil((startedAt - Date.now()) / 1000) : 0, statuses: Object.fromEntries(Object.entries(live).map(([id, l]) => [id, l.status])) });
       }
     };
 
     // Dev-only probes exercise the same movement and scene as a live match.
     const debug = {
-      get state() { return { x: meL.x, y: meL.y, h: meL.h, ready: sc.ready, keyMask }; },
+      get state() { return { x: meL.x, y: meL.y, h: meL.h, ready: sc.ready, keyMask, doors: doorOpen }; },
       teleport(node: number) { const p = housePoint(node); Object.assign(meL, p, { tx: p.x, ty: p.y, th: p.h }); },
       move(dx: number, dy: number) { const p = step(meL, dx, dy); meL.x = meL.tx = p.x; meL.y = meL.ty = p.y; meL.th = meL.h; },
       look(yaw: number, p = 0) { meL.yaw = yaw; pitch = p; },
       path(node: number) { return housePath(meL, housePoint(node)); },
-      walkPath(node: number) { const path = housePath(meL, housePoint(node)); for (const id of path) { const p = housePoint(id); const next = moveHouse(meL, p.x - meL.x, p.y - meL.y); Object.assign(meL, next, { tx: next.x, ty: next.y, th: next.h }); } return { x: meL.x, y: meL.y, h: meL.h }; },
+      walkPath(node: number) { const path = housePath(meL, housePoint(node)); for (const id of path) { const p = housePoint(id); const next = step(meL, p.x - meL.x, p.y - meL.y); Object.assign(meL, next, { tx: next.x, ty: next.y, th: next.h }); } return { x: meL.x, y: meL.y, h: meL.h }; },
+      door(i: number) { doorRef.current(i); },
+      doorPositions: DOORS,
       placements: HOUSE.placements,
     };
     const debugWindow = window as Window & { __game?: typeof debug };

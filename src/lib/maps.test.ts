@@ -7,7 +7,7 @@ describe("maps", () => {
   it("hotel floors are separated: walking through the old doorway is blocked", () => {
     applyMap("hotel");
     expect(move(750, 470, 0, 60).y).toBeLessThan(500);
-    applyMap("rumah");
+    applyMap("rumahsakit");
     setDoorOpen(nearestDoor(750, 500), true);
     expect(move(750, 470, 0, 60).y).toBeGreaterThan(500);
   });
@@ -20,14 +20,14 @@ describe("maps", () => {
 });
 describe("doors", () => {
   it("start closed and block walking until clicked open", () => {
-    applyMap("rumah");
+    applyMap("rumahsakit");
     const i = nearestDoor(500, 250); expect(i).toBeGreaterThanOrEqual(0); expect(DOORS[i]!.v).toBe(true);
     expect(move(470, 250, 60, 0).x).toBeLessThan(500);
     setDoorOpen(i, true);
     expect(move(470, 250, 60, 0).x).toBeGreaterThan(500);
   });
   it("close again after a map reset", () => {
-    applyMap("rumah"); const i = nearestDoor(500, 250); setDoorOpen(i, true);
-    applyMap("rumah"); expect(move(470, 250, 60, 0).x).toBeLessThan(500);
+    applyMap("rumahsakit"); const i = nearestDoor(500, 250); setDoorOpen(i, true);
+    applyMap("rumahsakit"); expect(move(470, 250, 60, 0).x).toBeLessThan(500);
   });
 });

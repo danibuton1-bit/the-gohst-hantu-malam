@@ -1,5 +1,5 @@
 # Roadmap
-- [ ] Replace Rumah Tua with uploaded GLB; derive collision and walkable stairs from its geometry, verify traversal and rendering.
+- [ ] Repair complete uploaded house rendering and reachable second floor; map interactive doors to its geometry and verify stairs, doors, and map regressions.
 - [x] New characters (Raka, Aisyah, Qila, Nabila), blinking eyes, idle motion
 - [x] Emblem logo
 - [x] World chat (24h), private chat, in-game chat

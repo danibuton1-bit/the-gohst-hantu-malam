@@ -43,6 +43,7 @@ const BASE_DOORS: { x: number; y: number; v: boolean }[] = [
   { x: 250, y: RH, v: false }, { x: 750, y: RH, v: false }, { x: 1250, y: RH, v: false },
 ];
 export const DOOR_W = DOOR;
+export type Door = { x: number; y: number; v: boolean; h?: number; width?: number; thickness?: number; height?: number; mesh?: number };
 
 const OUTER_INNER: Rect[] = [
   ...hWall(0, T / 2, WORLD.w), ...hWall(0, WORLD.h - T / 2, WORLD.w),
@@ -81,7 +82,7 @@ export const LIFT_R = 45;
 
 export let MAP_ID: MapId = "rumah";
 export let ROOMS: Room[] = BASE_ROOMS;
-export let DOORS = BASE_DOORS;
+export let DOORS: Door[] = BASE_DOORS;
 export let WALLS: Rect[] = [...OUTER_INNER, ...MID_DOORS, ...FURNITURE];
 export function applyMap(id: MapId) {
   MAP_ID = id;
@@ -89,7 +90,7 @@ export function applyMap(id: MapId) {
   const m = MAPS.find((x) => x.id === id);
   if (!m) return;
   ROOMS = BASE_ROOMS.map((r, i) => ({ ...r, name: m.names[i] ?? r.name }));
-  DOORS = id === "rumah" ? [] : id === "hotel" ? BASE_DOORS.filter((d) => d.v) : BASE_DOORS;
+  DOORS = id === "rumah" ? HOUSE.doors : id === "hotel" ? BASE_DOORS.filter((d) => d.v) : BASE_DOORS;
   WALLS = id === "rumah" ? [] : [...OUTER_INNER, ...(id === "hotel" ? MID_SOLID : MID_DOORS), ...FURNITURE];
   KEYS = id === "rumah" ? HOUSE.placements.keys.map((node, i) => ({ ...BASE_KEYS[i], id: i, name: BASE_KEYS[i]?.name ?? "Kunci Rumah", ...housePoint(node) })) : BASE_KEYS;
   BATTERIES = id === "rumah" ? HOUSE.placements.batteries.map((node, id) => ({ id, ...housePoint(node) })) : BASE_BATTERIES;
@@ -98,16 +99,19 @@ export function applyMap(id: MapId) {
   GHOST_SPAWN = id === "rumah" ? housePoint(HOUSE.placements.ghost) : BASE_GHOST_SPAWN;
   BOT_PATROL = id === "rumah" ? HOUSE.placements.patrol.map((id) => { const p = housePoint(id); return [p.x, p.y]; }) : BASE_BOT_PATROL;
   doorOpen = DOORS.map(() => false);
+  doorUsed = DOORS.map(() => false);
 }
 /** Doors start closed and only open when a player clicks them; closed doors block movement. */
 export let doorOpen: boolean[] = BASE_DOORS.map(() => false);
-export function setDoorOpen(i: number, open: boolean) { if (i >= 0 && i < doorOpen.length) doorOpen[i] = open; }
-export function doorRect(d: { x: number; y: number; v: boolean }): Rect {
-  return d.v ? { x: d.x - T / 2, y: d.y - DOOR / 2, w: T, h: DOOR } : { x: d.x - DOOR / 2, y: d.y - T / 2, w: DOOR, h: T };
+export let doorUsed: boolean[] = BASE_DOORS.map(() => false);
+export function setDoorOpen(i: number, open: boolean) { if (i >= 0 && i < doorOpen.length) { doorOpen[i] = open; if (open) doorUsed[i] = true; } }
+export function doorRect(d: Door): Rect {
+  const width = d.width ?? DOOR, thickness = d.thickness ?? T;
+  return d.v ? { x: d.x - thickness / 2, y: d.y - width / 2, w: thickness, h: width } : { x: d.x - width / 2, y: d.y - thickness / 2, w: width, h: thickness };
 }
-export function nearestDoor(x: number, y: number, max = 90) {
+export function nearestDoor(x: number, y: number, max = 90, h?: number) {
   let best = -1, bd = max;
-  DOORS.forEach((d, i) => { const dd = Math.hypot(d.x - x, d.y - y); if (dd < bd) { bd = dd; best = i; } });
+  DOORS.forEach((d, i) => { if (h !== undefined && d.h !== undefined && Math.abs(h - d.h) > .5) return; const dd = Math.hypot(d.x - x, d.y - y); if (dd < bd) { bd = dd; best = i; } });
   return best;
 }
 const blocked = (x: number, y: number, r: number) => WALLS.some((w) => circleHitsRect(x, y, r, w)) || DOORS.some((d, i) => !doorOpen[i] && circleHitsRect(x, y, r, doorRect(d)));
@@ -143,7 +147,7 @@ export function circleHitsRect(cx: number, cy: number, r: number, b: Rect) {
 }
 
 export function move(x: number, y: number, dx: number, dy: number, r = PLAYER_R, h = .756): { x: number; y: number; h?: number } {
-  if (MAP_ID === "rumah") return moveHouse({ x, y, h }, dx, dy);
+  if (MAP_ID === "rumah") return moveHouse({ x, y, h }, dx, dy, (p) => DOORS.some((d, i) => !doorOpen[i] && Math.abs((d.h ?? 0) - p.h) < .5 && circleHitsRect(p.x, p.y, r, doorRect(d))));
   const steps = Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 4);
   if (steps > 1) {
     let p = { x, y };

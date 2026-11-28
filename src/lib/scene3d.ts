@@ -1,6 +1,6 @@
 // First-person 3D renderer for the shared 2D game world. World px -> meters via U.
 import * as THREE from "three";
-import { BATTERIES, DOORS, DOOR_W, EXIT, FLOOR2_H, FLOOR2_Y, KEYS, LIFTS, ROOMS, WALLS, WORLD, doorOpen, type MapId, type Rect } from "./game";
+import { BATTERIES, DOORS, DOOR_W, EXIT, FLOOR2_H, FLOOR2_Y, KEYS, LIFTS, ROOMS, WALLS, WORLD, doorOpen, type Door, type MapId, type Rect } from "./game";
 import { audio } from "./audio";
 import { CHARACTERS, isChar, type CharId } from "./art";
 import { buildAvatar, nameTag, type Avatar } from "./avatar3d";
@@ -8,7 +8,7 @@ import { buildKuyang, type Kuyang } from "./kuyang3d";
 import { getGfx, pixelRatioFor } from "./graphics";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
-import houseAsset from "@/assets/models/haunted_house_optimized.glb.asset.json";
+import houseAsset from "@/assets/models/haunted_house.glb.asset.json";
 import { HOUSE, houseHeight } from "./house";
 
 export const U = 1 / 50;
@@ -144,7 +144,7 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
   scene.background = new THREE.Color(fogCol);
   scene.fog = new THREE.FogExp2(fogCol, opts.drone ? 0.035 : opts.amGhost ? 0.035 : 0.11);
   if (opts.drone) scene.add(new THREE.HemisphereLight(0x8899cc, 0x221111, 1.4));
-  const camera = new THREE.PerspectiveCamera(72, 1, 0.05, opts.drone ? 260 : 60);
+  const camera = new THREE.PerspectiveCamera(72, 1, 0.05, opts.drone ? 260 : MAP === "rumah" ? 120 : 60);
   camera.rotation.order = "YXZ";
   scene.add(camera);
   scene.add(new THREE.HemisphereLight(opts.amGhost ? 0xc9a0ff : 0x2a2440, opts.amGhost ? 0x402050 : 0x080404, opts.amGhost ? 2.6 : LOW_END ? 0.32 : 0.22));
@@ -154,6 +154,7 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
 
   let disposed = false;
   let houseReady = MAP !== "rumah";
+  const doors: { d: Door; pivot: THREE.Group; base: number; open: number; was: boolean; index: number }[] = [];
   if (MAP === "rumah") {
     const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
     loader.load(houseAsset.url, (gltf) => {
@@ -162,11 +163,57 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
       root.scale.setScalar(HOUSE.scale);
       root.position.set(HOUSE.offset[0] ?? 15, HOUSE.offset[1] ?? 0, HOUSE.offset[2] ?? 21);
       root.traverse((o) => { if (o instanceof THREE.Mesh) { o.receiveShadow = true; const materials = Array.isArray(o.material) ? o.material : [o.material]; materials.forEach((m) => { m.side = THREE.DoubleSide; }); } });
-      scene.add(root); houseReady = true;
+      scene.add(root); root.updateMatrixWorld(true);
+      const meshes = new Map<number, THREE.Mesh>();
+      root.traverse((o) => { if (o instanceof THREE.Mesh) { const id = gltf.parser.associations.get(o)?.meshes; if (id !== undefined) meshes.set(id, o); } });
+      const worldCopy = (source: THREE.Mesh, rise: number) => {
+        const mesh = new THREE.Mesh(source.geometry, source.material);
+        source.matrixWorld.decompose(mesh.position, mesh.quaternion, mesh.scale);
+        mesh.position.y += rise; mesh.receiveShadow = true; scene.add(mesh); return mesh;
+      };
+      // Extend the existing room walls, preserving their door and window openings.
+      for (const id of HOUSE.extension.structure) { const source = meshes.get(id); if (source) worldCopy(source, HOUSE.extension.rise); }
+      DOORS.forEach((d, index) => {
+        if (d.mesh === undefined) return;
+        const source = meshes.get(d.mesh); if (!source) return;
+        const panel = worldCopy(source, (d.h ?? .756) - .756);
+        const pivot = new THREE.Group();
+        const width = (d.width ?? DOOR_W) * U;
+        pivot.position.set(d.x * U - (d.v ? 0 : width / 2), d.h ?? .756, d.y * U - (d.v ? width / 2 : 0));
+        scene.add(pivot); pivot.updateMatrixWorld(true); pivot.attach(panel);
+        panel.userData["pick"] = `door:${index}`; pickables.push(panel);
+        doors.push({ d, pivot, base: 0, open: 0, was: false, index });
+        source.visible = false;
+      });
+      const ext = HOUSE.extension;
+      const floorTexture = woodTex("#4a2e1e"); floorTexture.repeat.set(8, 6);
+      const floorMat = Mat({ map: floorTexture, roughness: .9, side: THREE.DoubleSide });
+      for (const [x0, z0, x1, z1] of ext.floors) {
+        if (x0 === undefined || z0 === undefined || x1 === undefined || z1 === undefined) continue;
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), floorMat);
+        floor.rotation.x = -Math.PI / 2; floor.position.set((x0 + x1) / 2, ext.upper, (z0 + z1) / 2); floor.receiveShadow = true; scene.add(floor);
+      }
+      const [x0, z0, x1, z1] = ext.bounds;
+      if (x0 !== undefined && z0 !== undefined && x1 !== undefined && z1 !== undefined) {
+        const roof = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), floorMat);
+        roof.rotation.x = Math.PI / 2; roof.position.set((x0 + x1) / 2, ext.upper + ext.rise, (z0 + z1) / 2); scene.add(roof); ceilings.push(roof);
+      }
+      const railMat = Mat({ color: 0x54453b, metalness: .45, roughness: .75 });
+      for (const [ax, az, bx, bz] of ext.rails) {
+        if (ax === undefined || az === undefined || bx === undefined || bz === undefined) continue;
+        const length = Math.hypot(bx - ax, bz - az), angle = -Math.atan2(bz - az, bx - ax);
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(length, .07, .07), railMat);
+        rail.position.set((ax + bx) / 2, ext.upper + 1.05, (az + bz) / 2); rail.rotation.y = angle; scene.add(rail);
+        for (let i = 0; i <= Math.ceil(length / .5); i++) {
+          const t = i / Math.ceil(length / .5), post = new THREE.Mesh(new THREE.BoxGeometry(.045, 1.05, .045), railMat);
+          post.position.set(ax + (bx - ax) * t, ext.upper + .525, az + (bz - az) * t); scene.add(post);
+        }
+      }
+      houseReady = true;
     }, undefined, () => { canvas.dataset["sceneError"] = "Rumah gagal dimuat"; });
     const daylight = new THREE.HemisphereLight(0xaabdc9, 0x3f3931, 1.5); scene.add(daylight);
     const moon = new THREE.DirectionalLight(0xc5d2dc, 1.6); moon.position.set(-5, 15, 10); scene.add(moon);
-    (scene.fog as THREE.FogExp2).density = .018;
+    (scene.fog as THREE.FogExp2).density = .008;
     scene.background = new THREE.Color(0x101820);
   }
   // floors and ceilings per room
@@ -238,9 +285,9 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
     const cl = new THREE.PointLight(0xfff0d0, 4, 4); cl.position.set(0, H - 0.2, 0); cabin.add(cl);
     lift = { cabin, land, inner, label: { ctx: lctx, tex: ltex, last: "" } };
   }
-  // doors (auto-swing open when anyone is near)
+  // Other maps keep their procedural doors; the house swings its original GLB panels.
   const doorMat = Mat({ map: woodTex("#4a2c18"), roughness: 0.9 });
-  const doors = DOORS.map((d) => {
+  (MAP === "rumah" ? [] : DOORS).forEach((d, index) => {
     const pivot = new THREE.Group();
     const w = DOOR_W * U * 0.96, h = WALL_H * 0.85;
     const panel = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.08), doorMat);
@@ -252,7 +299,7 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
     else pivot.position.set(v.x, v.b, v.z);
     const i = DOORS.indexOf(d); panel.userData["pick"] = `door:${i}`; knob.userData["pick"] = `door:${i}`; pickables.push(panel, knob);
     scene.add(pivot);
-    return { d, pivot, base: pivot.rotation.y, open: 0, was: false };
+    doors.push({ d, pivot, base: pivot.rotation.y, open: 0, was: false, index });
   });
   const theme = buildTheme(scene, MAP);
   // graves
@@ -366,8 +413,8 @@ export function createScene(canvas: HTMLCanvasElement, opts: { me: CharId | "gho
       /** Hotel lift: cabin height (m), landing door openness per floor (0..1), travel direction, and whether the camera rides it. */
       lift?: { y: number; doors: number[]; dir: number; riding: boolean } | null;
     }) {
-      doors.forEach((dr, i) => {
-        const near = !!doorOpen[i];
+      doors.forEach((dr) => {
+        const near = !!doorOpen[dr.index];
         if (near !== dr.was && Math.hypot(st.cam.x - dr.d.x, st.cam.y - dr.d.y) < 400) audio.creak();
         dr.was = near;
         dr.open += ((near ? 1 : 0) - dr.open) * Math.min(1, st.dt * 4);

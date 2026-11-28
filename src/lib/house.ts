@@ -31,7 +31,7 @@ export function houseNode(pos: HousePosition) {
 /** Capsule clearance and headroom were baked from the very same GLB transform.
  * Neighbour-only steps prevent tunnelling and switching to another stacked floor.
  */
-export function moveHouse(pos: HousePosition, dx: number, dy: number): HousePosition {
+export function moveHouse(pos: HousePosition, dx: number, dy: number, blocked: (pos: HousePosition) => boolean = () => false): HousePosition {
   let result = { ...pos };
   const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 3));
   for (let s = 0; s < steps; s++) {
@@ -44,7 +44,7 @@ export function moveHouse(pos: HousePosition, dx: number, dy: number): HousePosi
         return p && Math.abs(p.h - result.h) <= data.maxStep + .001 && (id === from || data.links[from]?.includes(id));
       });
       const p = to === undefined ? undefined : points[to];
-      if (p) result = { ...next, h: p.h };
+      if (p) { const candidate = { ...next, h: p.h }; if (!blocked(candidate)) result = candidate; }
     }
   }
   return result;
